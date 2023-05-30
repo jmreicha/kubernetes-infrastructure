@@ -1,0 +1,7 @@
+name: velero
+version: 1.0.0
+apiVersion: v2
+dependencies:
+  - name: velero
+    version: "4.0.2"
+    repository: "https://vmware-tanzu.github.io/helm-charts"

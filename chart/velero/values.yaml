@@ -1,0 +1,8 @@
+velero:
+  image:
+    repository: velero/velero
+    tag: "v1.11.0"
+
+  # Disabled for now
+  backupsEnabled: false
+  snapshotsEnabled: false
