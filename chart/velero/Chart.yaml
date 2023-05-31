@@ -1,7 +1,9 @@
-name: velero
-version: 1.0.0
 apiVersion: v2
+name: velero
+description: A Helm chart for Velero
+version: 1.0.0
+appVersion: "1.0"
 dependencies:
-  - name: velero
-    version: "4.0.2"
-    repository: "https://vmware-tanzu.github.io/helm-charts"
+- name: velero
+  version: "4.0.2"
+  repository: "https://vmware-tanzu.github.io/helm-charts"
