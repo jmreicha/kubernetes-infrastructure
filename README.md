@@ -15,14 +15,8 @@ Generic infrastructure included:
 - [x] Gatekeeper
 - [x] Reloader
 - [x] Velero
-
-AWS specific infrastructure included:
-
-- [ ] ALB controller
-- [ ] Appmesh controller
-- [ ] EBS CSI controller
-- [ ] Karpenter
-- [ ] Keda
+- [x] Nginx Ingress
+- [x] Kube Prometheus
 
 ## Getting started
 
@@ -42,7 +36,8 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 argocd login localhost:8080
 ```
 
-Bootstrap the ArgoCD infrastructure.
+Bootstrap the ArgoCD infrastructure project. This is needs to exist first for
+the infra charts to be deployed into.
 
 ```bash
 kubectl apply -f bootstrap/project.yaml
