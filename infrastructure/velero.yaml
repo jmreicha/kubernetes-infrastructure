@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: velero
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: infrastructure
+  source:
+    repoURL: https://github.com/jmreicha/kubernetes-infrastructure.git
+    targetRevision: "HEAD"
+    path: chart/velero
+    helm:
+      releaseName: velero
+      valueFiles:
+        - values.yaml
+  destination:
+    server: "https://kubernetes.default.svc"
+    namespace: infrastructure
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

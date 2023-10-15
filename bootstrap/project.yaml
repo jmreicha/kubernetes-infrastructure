@@ -1,0 +1,30 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: infrastructure
+  labels:
+    name: infrastructure
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: infrastructure
+  namespace: argocd
+spec:
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  destinations:
+    - namespace: "*"
+      server: "*"
+  sourceRepos:
+    # Do not use the test repo in argoproj
+    # - "!ssh://git@GITHUB.com:argoproj/test"
+    # Nor any Gitlab repo under group/
+    # - "!https://gitlab.com/group/**"
+    # Any other repo is fine though
+    - "*"
+
+  # TODO: Point configs are our repo and automatically start them
