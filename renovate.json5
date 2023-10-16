@@ -1,0 +1,46 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:base",
+        ":disableDependencyDashboard"
+    ],
+    "argocd": {
+        "fileMatch": [
+            "infrastructure/.+\\.yaml$"
+        ]
+    },
+    "kubernetes": {
+        "fileMatch": [
+            "manifest/.+\\.yaml$"
+        ]
+    },
+    "labels": [
+        "dependencies"
+    ],
+    "packageRules": [
+        {
+            "automerge": true,
+            "automergeType": "branch",
+            "groupName": "auto-update",
+            "managers": [
+                "argocd"
+            ],
+            "matchUpdateTypes": [
+                "minor",
+                "patch",
+                "pin",
+                "digest"
+            ]
+        }
+    ],
+    "pre-commit": {
+        "enabled": true
+    },
+    "prConcurrentLimit": 5,
+    "recreateClosed": true,
+    "vulnerabilityAlerts": {
+        "labels": [
+            "security"
+        ]
+    }
+}
