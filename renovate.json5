@@ -25,6 +25,7 @@
             ],
             "automergeType": "branch",
             "groupName": "auto-update",
+            "ignoreTests": true,
             "managers": [
                 "argocd"
             ],
