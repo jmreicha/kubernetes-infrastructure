@@ -20,6 +20,9 @@
     "packageRules": [
         {
             "automerge": true,
+            "automergeSchedule": [
+                "before 3:00am"
+            ],
             "automergeType": "branch",
             "groupName": "auto-update",
             "managers": [
@@ -38,6 +41,9 @@
     },
     "prConcurrentLimit": 5,
     "recreateClosed": true,
+    "schedule": [
+        "before 3:00am"
+    ],
     "vulnerabilityAlerts": {
         "labels": [
             "security"
