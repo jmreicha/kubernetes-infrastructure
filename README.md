@@ -10,13 +10,12 @@ Generic infrastructure included:
 - [x] Argo rollouts
 - [x] Argo workflows
 - [x] Cert manager
-- [x] External DNS
 - [x] External secrets
 - [x] Gatekeeper
+- [x] Kube Prometheus
+- [x] Nginx Ingress
 - [x] Reloader
 - [x] Velero
-- [x] Nginx Ingress
-- [x] Kube Prometheus
 
 ## Getting started
 
@@ -50,3 +49,5 @@ kubectl apply -f infrastructure
 ```
 
 TODO: Alternatively, deploy everything with `argocd`.
+
+TODO: Tests for renovate version update automerges. Run a k3s cluster and make sure all the manifests deploy correctly?
