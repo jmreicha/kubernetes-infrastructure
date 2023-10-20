@@ -13,9 +13,14 @@ spec:
     targetRevision: 1.13.1
     helm:
       releaseName: cert-manager
+      parameters:
+        - name: installCRDs
+          value: true
   destination:
     server: "https://kubernetes.default.svc"
     namespace: infrastructure
   syncPolicy:
     automated:
       prune: true
+    syncOptions:
+      - ServerSideApply=true
