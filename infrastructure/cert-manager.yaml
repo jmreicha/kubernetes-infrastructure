@@ -15,7 +15,7 @@ spec:
       releaseName: cert-manager
       parameters:
         - name: installCRDs
-          value: true
+          value: "true"
   destination:
     server: "https://kubernetes.default.svc"
     namespace: infrastructure
