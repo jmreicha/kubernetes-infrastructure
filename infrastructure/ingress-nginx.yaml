@@ -22,7 +22,7 @@ spec:
           value: "true"
         - name: controller.service.annotations
           # Change this annotation to match cloud provider as needed
-          vaule: "{service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: 'true'}"
+          vaule: "service\.beta\.kubernetes\.io/do-loadbalancer-enable-proxy-protocol=true"
   destination:
     server: "https://kubernetes.default.svc"
     namespace: infrastructure
