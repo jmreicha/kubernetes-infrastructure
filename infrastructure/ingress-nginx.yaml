@@ -14,15 +14,13 @@ spec:
     helm:
       releaseName: ingress-nginx
       parameters:
-        - name: config.compute-full-forwarded-for
+        - name: controller.config.use-forwarded-headers
           value: "true"
-        - name: config.use-forwarded-headers
-          value: "true"
-        - name: config.use-proxy-protocol
+        - name: controller.config.use-proxy-protocol
           value: "true"
         - name: controller.service.annotations
           # Change this annotation to match cloud provider as needed
-          vaule: "service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: 'true'"
+          vaule: "service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: \"true\""
   destination:
     server: "https://kubernetes.default.svc"
     namespace: infrastructure
