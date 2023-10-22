@@ -22,7 +22,7 @@ spec:
           service:
             annotations:
               # Change this annotation to match cloud provider as needed
-              service.beta\.kubernetes\.io/do-loadbalancer-enable-proxy-protocol: "true"
+              service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: "true"
   destination:
     server: "https://kubernetes.default.svc"
     namespace: infrastructure
