@@ -27,7 +27,8 @@
             "groupName": "auto-update",
             "ignoreTests": true,
             "managers": [
-                "argocd"
+                "argocd",
+                "pre-commit"
             ],
             "matchUpdateTypes": [
                 "minor",
