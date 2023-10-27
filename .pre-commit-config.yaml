@@ -1,14 +1,14 @@
 ---
 repos:
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.29.0
+    rev: v1.32.0
     hooks:
       - id: yamllint
         files: \.(yaml|yml)$
         types: [file, yaml]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.3.0
+    rev: v3.4.0
     hooks:
       - id: trailing-whitespace
       - id: check-merge-conflict
@@ -17,7 +17,7 @@ repos:
       - id: check-json
 
   - repo: https://github.com/stackrox/kube-linter
-    rev: 0.6.0
+    rev: v0.6.3
     hooks:
       - id: kube-linter-system
 
