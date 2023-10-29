@@ -9,6 +9,9 @@
             "infrastructure/.+\\.yaml$"
         ]
     },
+    "automerge": true,
+    "automergeType": "pr",
+    "platformAutomerge": true,
     "kubernetes": {
         "fileMatch": [
             "manifest/.+\\.yaml$"
