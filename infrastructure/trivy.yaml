@@ -1,0 +1,38 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: trivy-operator
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: trivy-operator
+    repoURL: https://aquasecurity.github.io/helm-charts/
+    targetRevision: 0.19.1
+    helm:
+      values: |
+        operator:
+          metricsImageInfo: false
+          privateRegistryScanSecretsNames: {"infrastructure":"solidsystems"}
+        trivy:
+          command: filesystem # image
+          ignoreUnfixed: true
+          severity: CRTIICAL,HIGH
+        # Config required for reading local filesystem images
+        trivyOperator:
+          scanJobPodTemplateContainerSecurityContext:
+            runAsUser: 0
+        serviceMonitor:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: infrastructure
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
