@@ -1,0 +1,62 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: descheduler
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: descheduler
+    repoURL: https://kubernetes-sigs.github.io/descheduler/
+    targetRevision: 0.28.1
+    helm:
+      values: |
+        kind: Deployment
+        deschedulingInterval: 30m
+        # schedule: "0 * * * *"
+        # successfulJobsHistoryLimit: 1
+        # failedJobsHistoryLimit: 1
+        # ttlSecondsAfterFinished: 3600
+        # deschedulerPolicy:
+        #   strategies:
+        #     RemoveDuplicates:
+        #       enabled: true
+        #     RemovePodsHavingTooManyRestarts:
+        #       enabled: true
+        #       params:
+        #         podsHavingTooManyRestarts:
+        #           podRestartThreshold: 10
+        #           includingInitContainers: true
+        #     RemovePodsViolatingNodeTaints:
+        #       enabled: true
+        #     RemovePodsViolatingNodeAffinity:
+        #       enabled: true
+        #       params:
+        #         nodeAffinityType:
+        #         - requiredDuringSchedulingIgnoredDuringExecution
+        #     RemovePodsViolatingInterPodAntiAffinity:
+        #       enabled: true
+        #     RemovePodsViolatingTopologySpreadConstraint:
+        #       enabled: true
+        #       params:
+        #         includeSoftConstraints: false
+        #     HighNodeUtilization:
+        #       enabled: true
+        #       params:
+        #         nodeResourceUtilizationThresholds:
+        #           thresholds:
+        #             cpu: 60
+        #             memory: 60
+        #             pods: 40
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: infrastructure
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

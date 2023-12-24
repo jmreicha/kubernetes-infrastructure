@@ -6,7 +6,10 @@
     ],
     "argocd": {
         "fileMatch": [
-            "infrastructure/.+\\.yaml$"
+            "infrastructure/.+\\.yaml$",
+            "monitoring/.+\\.yaml$",
+            "network/.+\\.yaml$",
+            "security/.+\\.yaml$"
         ]
     },
     "kubernetes": {

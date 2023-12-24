@@ -5,6 +5,7 @@ repos:
     rev: v1.33.0
     hooks:
       - id: yamllint
+        # args: [-d '{extends: default, rules: {line-length: {max: 120, level: warning}}}']
         files: \.(yaml|yml)$
         types: [file, yaml]
 

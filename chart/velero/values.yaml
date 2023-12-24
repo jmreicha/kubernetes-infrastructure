@@ -1,8 +1,0 @@
-velero:
-  image:
-    repository: velero/velero
-    tag: "main"
-
-  # Disabled for now
-  backupsEnabled: false
-  snapshotsEnabled: false
