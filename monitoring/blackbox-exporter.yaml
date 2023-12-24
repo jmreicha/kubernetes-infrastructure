@@ -2,12 +2,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    component: monitoring
   name: blackbox-exporter
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: infrastructure
+  project: monitoring
   source:
     chart: prometheus-blackbox-exporter
     repoURL: https://prometheus-community.github.io/helm-charts
@@ -22,4 +26,5 @@ spec:
     automated:
       prune: true
     syncOptions:
+      - CreateNamespace=true
       - ServerSideApply=true

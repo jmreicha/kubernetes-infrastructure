@@ -2,12 +2,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    component: monitoring
   name: node-problem-detector
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
+  project: monitoring
   source:
     chart: node-problem-detector
     repoURL: https://charts.deliveryhero.io/

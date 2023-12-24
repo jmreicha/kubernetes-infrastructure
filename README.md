@@ -48,8 +48,6 @@ kubectl apply -f security
 
 ## TODO
 
-- [ ] Add labels for the resource type.
-- [ ] Update project names.
 - [ ] Tests for renovate version update automerges. Run a k3s cluster and make sure all the manifests deploy correctly?
 - [ ] Pull Request previews. Create and comment a diff on a PR with the changes.
 - [ ] Pull Request test. Figure out what tests to run for changes.

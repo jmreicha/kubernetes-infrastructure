@@ -2,12 +2,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    component: monitoring
   name: metrics-server
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
+  project: monitoring
   source:
     chart: metrics-server
     repoURL: https://kubernetes-sigs.github.io/metrics-server
@@ -18,3 +22,5 @@ spec:
   syncPolicy:
     automated:
       prune: true
+    syncOptions:
+      - CreateNamespace=true

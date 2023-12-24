@@ -5,7 +5,7 @@ repos:
     rev: v1.33.0
     hooks:
       - id: yamllint
-        # args: [-d '{extends: default, rules: {line-length: {max: 120, level: warning}}}']
+        args: ['-d {extends: default, rules: {line-length: {max: 120, level: warning}}}']
         files: \.(yaml|yml)$
         types: [file, yaml]
 
@@ -29,4 +29,8 @@ repos:
       - id: commitizen
         stages: [commit-msg]
 
-# Markdown lint
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        # args: [--disable MD013 -- *.md]

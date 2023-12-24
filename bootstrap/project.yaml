@@ -2,14 +2,48 @@
 apiVersion: v1
 kind: Namespace
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
   name: infrastructure
   labels:
-    name: infrastructure
+    compoent: infrastructure
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  name: monitoring
+  labels:
+    compoent: monitoring
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  name: network
+  labels:
+    component: network
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  name: security
+  labels:
+    component: security
 
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
   name: infrastructure
   namespace: argocd
 spec:
@@ -30,6 +64,8 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
   name: monitoring
   namespace: argocd
 spec:
@@ -51,6 +87,8 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
   name: network
   namespace: argocd
 spec:
@@ -72,6 +110,8 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
   name: monitoring
   namespace: argocd
 spec:
@@ -93,6 +133,8 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
   name: security
   namespace: argocd
 spec:
@@ -114,6 +156,8 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
   name: monitoring
   namespace: argocd
 spec:

@@ -6,21 +6,19 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
   labels:
     component: infrastructure
-  name: argo-events
+  name: oauth2-proxy
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: infrastructure
   source:
-    chart: argo-events
-    repoURL: https://argoproj.github.io/argo-helm
-    targetRevision: 2.4.1
-    helm:
-      releaseName: argo-events
+    chart: oauth2-proxy
+    repoURL: https://oauth2-proxy.github.io/manifests
+    targetRevision: 6.20.1
   destination:
-    server: "https://kubernetes.default.svc"
-    namespace: argocd
+    server: https://kubernetes.default.svc
+    namespace: infrastructure
   syncPolicy:
     automated:
       prune: true

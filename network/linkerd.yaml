@@ -4,49 +4,21 @@ kind: Application
 metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
+  labels:
+    component: network
   name: linkerd
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
-  source:
-    chart: linkerd-crds
-    repoURL: https://helm.linkerd.io/stable
-    targetRevision: 1.8.0
-    helm:
-      values: |
-        # Fill in
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: infrastructure
-  syncPolicy:
-    automated:
-      prune: true
-    syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
-
----
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  annotations:
-    argocd.argoproj.io/sync-wave: "2"
-  name: linkerd
-  namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: default
-  source:
-    chart: linkerd-control-plane
-    repoURL: https://helm.linkerd.io/stable
-    targetRevision: 1.16.7
-    helm:
-      values: |
-        podMonitor:
-          enabled: true
+  project: network
+  sources:
+    - chart: linkerd-crds
+      repoURL: https://helm.linkerd.io/stable
+      targetRevision: 1.8.0
+    - chart: linkerd-control-plane
+      repoURL: https://helm.linkerd.io/stable
+      targetRevision: 1.16.7
   destination:
     server: https://kubernetes.default.svc
     namespace: infrastructure
