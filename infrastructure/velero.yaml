@@ -13,13 +13,9 @@ metadata:
 spec:
   project: infrastructure
   source:
-    repoURL: https://github.com/jmreicha/kubernetes-infrastructure.git
+    chart: velero
+    repoURL: https://vmware-tanzu.github.io/helm-charts
     targetRevision: 5.2.0
-    path: chart/velero
-    helm:
-      releaseName: velero
-      valueFiles:
-        - values.yaml
   destination:
     server: "https://kubernetes.default.svc"
     namespace: infrastructure
