@@ -35,6 +35,7 @@ the infra charts to be deployed.
 
 ```bash
 kubectl apply -f bootstrap/project.yaml
+kubectl get appprojects -A
 ```
 
 Deploy the rest of the infrastructure pieces.
