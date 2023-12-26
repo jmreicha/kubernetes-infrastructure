@@ -1,16 +1,20 @@
 # Kubernetes Infrastructure
 
-Declarative infrastructure for Kubernetes. These configs should be deployed as
-part of every cluster deployment. The configs are split into different parts:
+Declarative (and slightly opinionated) infrastructure for Kubernetes. This set
+of resources intends to provide a batteries-included set of self-updating
+infrastructure that can be used for configuring and securing Kubernetes clusters
+according to best practices.
 
-- bootstrap: bootstrap the required ArgoCD configs.
+The configs are split into different parts, which can be deployed separately:
+
+- bootstrap: required ArgoCD configs for configuration.
 - infrastructure: core infrastructure pieces that should be deployed into every cluster.
 - monitoring: monitoring configuration for the cluster.
 - network: network configuration for the cluster.
 - security: security configuration for the cluster.
 
 > [!NOTE]
-> These configs assume deployment with ArgoCD.
+> These configs all assume deployment with ArgoCD.
 
 ## Bootstrap configs with ArgoCD
 
