@@ -32,10 +32,6 @@ jobs:
 
       - name: Run Tests
         run: |
-          which bats
-          echo "Testing current directory..."
-          ls -lah
-          echo "Testing bats directory..."
-          ls -lah /usr/lib
           echo "Running tests..."
+          bats -v
           bats tests
