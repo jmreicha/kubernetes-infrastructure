@@ -33,4 +33,9 @@ repos:
     rev: v0.38.0
     hooks:
       - id: markdownlint
-        # args: [--disable MD013 -- *.md]
+        args: ['--disable', 'MD013', '--', '*.md']
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: main
+    hooks:
+      - id: actionlint
