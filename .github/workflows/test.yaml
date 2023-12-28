@@ -11,17 +11,21 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1.5.0
+        uses: helm/kind-action@v1.8.0
+        with:
+          cluster_name: "testing-cluster"
 
       - name: Install kubectl
         run: |
           curl -sSL -o /usr/local/bin/kubectl "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
           chmod +x /usr/local/bin/kubectl
+          kubectl version
 
       - name: Install argocd cli
         run: |
           curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
           chmod +x /usr/local/bin/argocd
+          argocd version
 
       - name: Setup Bats and bats libs
         uses: bats-core/setup-bats-libs@1.5.3
