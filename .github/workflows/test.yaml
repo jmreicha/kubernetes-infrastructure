@@ -32,6 +32,7 @@ jobs:
 
       - name: Run Tests
         run: |
+          ls -lah /usr/lib/bats-detik
           echo "Running tests..."
           bats -v
           bats tests
