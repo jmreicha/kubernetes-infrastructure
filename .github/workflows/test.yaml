@@ -24,6 +24,13 @@ jobs:
       - name: Setup Bats and Bats Libs
         uses: bats-core/setup-bats-libs@1.5.3
 
+      - name: Bootstrap ArgoCD
+        run: |
+          kubectl create namespace argocd
+          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+          kubectl apply -f bootstrap/project.yaml
+          kubectl get appprojects -A
+
       - name: Run Tests
         run: |
           echo "Running tests..."
