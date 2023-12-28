@@ -13,19 +13,16 @@ setup() {
     load "${TEST_PREFIX}/bats-support/load.bash"
     # shellcheck disable=SC2034
     DETIK_CLIENT_NAME="kubectl"
+    # shellcheck disable=SC2034
+    DETIK_CLIENT_NAMESPACE="argocd"
 }
 
-@test "verify bats works" {
-    run true
-    [ "$status" -eq 0 ]
-}
-
-@test "verify cluster connectivity works" {
-    run kubectl get pods -A
-    [ "$status" -eq 0 ]
-}
-
-@test "verify dry run works" {
+@test "verify 'infrastructure' install dry-run works" {
     run kubectl apply -f infrastructure --dry-run=server
     [ "$status" -eq 0 ]
+}
+
+@test "verify the argo custom resources were deployed" {
+    skip
+    kubectl get applications.argoproj.io k8up -n argocd -o jsonpath='{.status.health.status}'
 }
