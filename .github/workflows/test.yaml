@@ -28,4 +28,4 @@ jobs:
         run: |
           echo "Running tests..."
           bats -v
-          bats tests
+          bats -p tests
