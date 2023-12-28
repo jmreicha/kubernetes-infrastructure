@@ -15,22 +15,22 @@ jobs:
         with:
           cluster_name: "testing-cluster"
 
-      - name: Install kubectl
+      - name: Install Kubectl
         run: |
           curl -sSL -o /usr/local/bin/kubectl "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
           chmod +x /usr/local/bin/kubectl
           kubectl version
 
-      - name: Install argocd cli
+      - name: Install Argocd CLI
         run: |
           curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
           chmod +x /usr/local/bin/argocd
           argocd version --client
 
-      - name: Setup Bats and bats libs
+      - name: Setup Bats and Bats Libs
         uses: bats-core/setup-bats-libs@1.5.3
 
-      - name: Run tests
+      - name: Run Tests
         run: |
           echo "Running tests..."
-          # bats tests
+          bats tests
