@@ -1,0 +1,26 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    component: infrastructure
+  name: k8up
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: infrastructure
+  source:
+    chart: k8up # Object storage backups
+    repoURL: https://k8up-io.github.io/k8up
+    targetRevision: 4.4.3
+  destination:
+    server: "https://kubernetes.default.svc"
+    namespace: infrastructure
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

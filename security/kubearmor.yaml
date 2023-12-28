@@ -1,0 +1,26 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    component: security
+  name: kubearmor
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: security
+  source:
+    chart: kubearmor
+    repoURL: https://kubearmor.github.io/charts
+    targetRevision: v1.1.1
+  destination:
+    server: "https://kubernetes.default.svc"
+    namespace: infrastructure
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

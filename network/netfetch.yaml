@@ -1,0 +1,26 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    component: network
+  name: netfetch
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: network
+  source:
+    chart: netfetch
+    repoURL: https://deggja.github.io/netfetch/
+    targetRevision: 1.0.0
+  destination:
+    server: "https://kubernetes.default.svc"
+    namespace: infrastructure
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
