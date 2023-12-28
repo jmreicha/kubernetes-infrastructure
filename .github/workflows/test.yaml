@@ -1,0 +1,38 @@
+---
+name: Build and run tests
+
+on: pull_request
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.8.0
+        with:
+          cluster_name: "testing-cluster"
+
+      - name: Install Argocd CLI
+        run: |
+          curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x /usr/local/bin/argocd
+          argocd version --client
+
+      - name: Setup Bats and Bats Libs
+        uses: bats-core/setup-bats-libs@1.5.3
+
+      - name: Bootstrap ArgoCD
+        run: |
+          kubectl create namespace argocd
+          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+          kubectl apply -f bootstrap/project.yaml
+          kubectl get appprojects -A
+
+      - name: Run Tests
+        run: |
+          echo "Running tests..."
+          bats -v
+          bats --tap --timing --print-output-on-failure tests
