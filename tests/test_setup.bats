@@ -1,7 +1,12 @@
 #!/usr/bin/env bats
 
 setup() {
-    TEST_PREFIX="/usr/lib"
+    if [[ $CI == true ]]; then
+        TEST_PREFIX="/usr/lib"
+    else
+        TEST_PREFIX="$(brew --prefix)/lib"
+    fi
+
     load "${TEST_PREFIX}/bats-assert/load.bash"
     load "${TEST_PREFIX}/bats-detik/detik.bash"
     load "${TEST_PREFIX}/bats-file/load.bash"
