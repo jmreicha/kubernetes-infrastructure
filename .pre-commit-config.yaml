@@ -36,6 +36,6 @@ repos:
         args: ['--disable', 'MD013', '--', '*.md']
 
   - repo: https://github.com/rhysd/actionlint
-    rev: main
+    rev: v1.6.26
     hooks:
       - id: actionlint
