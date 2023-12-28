@@ -15,6 +15,11 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
+@test "verify cluster connectivity works" {
+    run kubectl get pods -A
+    [ "$status" -eq 0 ]
+}
+
 # @test "verify install dry run works" {
 #     run kubectl apply -f infrastructure --dry-run=server
 #     [ "$status" -eq 0 ]
