@@ -20,7 +20,7 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
-# @test "verify install dry run works" {
-#     run kubectl apply -f infrastructure --dry-run=server
-#     [ "$status" -eq 0 ]
-# }
+@test "verify dry run works" {
+    run kubectl apply -f infrastructure --dry-run=server
+    [ "$status" -eq 0 ]
+}
