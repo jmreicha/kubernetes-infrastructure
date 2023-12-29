@@ -44,16 +44,20 @@ jobs:
         run: |
           curl -sSL -o /usr/local/bin/goff https://github.com/puzzle/goff/releases/download/v0.2.3/goff-linux-amd64-v0.2.3
           chmod +x /usr/local/bin/goff
+          goff
 
       - name: Generate ArgoCD Diffs for Preview
         run: |
+          # Allow access to Argo
+          # kubectl port-forward svc/argocd-repo-server -n argocd 8081
+
           # Source
           # helm template mychart ./source/helm/mychart --output-dir /tmp/source/out
-          goff argocd app "./infrastructure/reloader.yaml" --repoServer="localhost:8081" --output-dir=/tmp/source/
+          goff argocd app "./infrastructure/reloader.yaml" --repo-server="localhost:8081" --output-dir=/tmp/source/
 
           # Destination
           # helm template mychart ./target/helm/mychart --output-dir /tmp/target/out
-          goff argocd app "./infrastructure/reloader" --repoServer="localhost:8081" --output-dir=/tmp/target/
+          goff argocd app "./infrastructure/reloader" --repo-server="localhost:8081" --output-dir=/tmp/target/
 
           # Diff
           # goff diff "/tmp/source" "/tmp/target" --title=Preview --output-dir .
