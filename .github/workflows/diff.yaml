@@ -50,6 +50,7 @@ jobs:
         run: |
           # Allow access to Argo
           kubectl port-forward svc/argocd-repo-server -n argocd 8081 &
+          ls -lah
 
           # Source
           # helm template mychart ./source/helm/mychart --output-dir /tmp/source/out
@@ -57,7 +58,7 @@ jobs:
 
           # Destination
           # helm template mychart ./target/helm/mychart --output-dir /tmp/target/out
-          goff argocd app "./infrastructure/reloader" --repo-server="localhost:8081" --output-dir=/tmp/target/
+          goff argocd app "./infrastructure/reloader.yaml" --repo-server="localhost:8081" --output-dir=/tmp/target/
 
           # Diff
           # goff diff "/tmp/source" "/tmp/target" --title=Preview --output-dir .
