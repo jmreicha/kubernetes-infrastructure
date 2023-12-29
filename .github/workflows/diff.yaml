@@ -63,10 +63,10 @@ jobs:
           sleep 5
 
           # Source
-          goff argocd app "./source/infrastructure/reloader.yaml" --repo-server="localhost:8081" --output-dir=/tmp/source/
+          goff argocd app "./source" --repo-server="localhost:8081" --output-dir=/tmp/source/
 
           # Destination
-          goff argocd app "./target/infrastructure/reloader.yaml" --repo-server="localhost:8081" --output-dir=/tmp/target/
+          goff argocd app "./target" --repo-server="localhost:8081" --output-dir=/tmp/target/
 
           # Diff
           goff diff "/tmp/source" "/tmp/target" --output-dir .
