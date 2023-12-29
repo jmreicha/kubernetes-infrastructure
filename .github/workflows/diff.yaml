@@ -37,8 +37,6 @@ jobs:
         run: |
           kubectl create namespace argocd
           kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-          # TODO: Use kubectl wait command for resources to be ready
-          sleep 10
 
       - name: Install Goff
         run: |
@@ -50,7 +48,15 @@ jobs:
         run: |
           # Allow access to Argo
           kubectl port-forward svc/argocd-repo-server -n argocd 8081 &
-          ls -lah
+          while true; do
+            status=$(curl -Is http://localhost:8081 | grep HTTP/1.1 | awk '{print $2}')
+            if [ "$status" == "200" ]; then
+              break
+            else
+              echo "Waiting for argocd-repo-server service to respond..."
+              sleep 5
+            fi
+          done
 
           # Source
           # helm template mychart ./source/helm/mychart --output-dir /tmp/source/out
