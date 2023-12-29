@@ -22,7 +22,7 @@ jobs:
           argocd version --client
 
       - name: Setup Bats and Bats Libs
-        uses: bats-core/setup-bats-libs@1.5.3
+        uses: bats-core/setup-bats-libs@1.5.4
 
       - name: Bootstrap ArgoCD
         run: |
