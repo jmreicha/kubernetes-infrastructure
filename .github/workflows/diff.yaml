@@ -50,7 +50,7 @@ jobs:
           while true; do
             status=$(kubectl get pod -n argocd -l app.kubernetes.io/name=argocd-repo-server -o jsonpath='{.items[0].status.phase}')
             if [ "$status" == "Running" ]; then
-              # Wait for argocd-repo-server to initialize
+              # TODO: Figure out how to background when there is no tty so we can see goff commands run
               kubectl port-forward svc/argocd-repo-server -n argocd 8081 &
               break
             else
@@ -59,18 +59,16 @@ jobs:
             fi
           done
 
+          # Wait for port-forward to be ready
           sleep 5
 
           # Source
-          # helm template mychart ./source/helm/mychart --output-dir /tmp/source/out
           goff argocd app "./source/infrastructure/reloader.yaml" --repo-server="localhost:8081" --output-dir=/tmp/source/
 
           # Destination
-          # helm template mychart ./target/helm/mychart --output-dir /tmp/target/out
           goff argocd app "./target/infrastructure/reloader.yaml" --repo-server="localhost:8081" --output-dir=/tmp/target/
 
           # Diff
-          # goff diff "/tmp/source" "/tmp/target" --title=Preview --output-dir .
           goff diff "/tmp/source" "/tmp/target" --output-dir .
 
       - name: comment PR
@@ -81,3 +79,5 @@ jobs:
           path: diff.md
 
       # TODO: Automatically merge PR if no changes
+
+      # TODO: Hide/delete old diff comments when new diff is created
