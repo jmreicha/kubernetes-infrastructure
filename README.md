@@ -55,6 +55,6 @@ You can run `bats tests` from the root of the repo to run all tests.
 
 ## TODO
 
-- [ ] Tests for renovate version update automerges. Run a k3s cluster and make sure all the manifests deploy correctly?
-- [ ] Pull Request previews. Create and comment a diff on a PR with the changes.
+- [ ] More tests for PRs.
 - [ ] Look into how hard it would be to automate/template out new applications.
+- [ ] Bootstrap Argo to be managed with Argo.

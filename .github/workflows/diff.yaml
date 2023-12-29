@@ -1,0 +1,83 @@
+---
+name: Diff ArgoCD Manifests
+
+on:
+  pull_request:
+    paths:
+      - "infrastructure/**"
+      - "monitoring/**"
+      - "network/**"
+      - "security/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Checkout Target PR
+        uses: actions/checkout@v4
+        with:
+          path: target
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.8.0
+        with:
+          cluster_name: "testing-cluster"
+
+      - name: Bootstrap ArgoCD
+        run: |
+          kubectl create namespace argocd
+          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+      - name: Install Goff
+        run: |
+          curl -sSL -o /usr/local/bin/goff https://github.com/puzzle/goff/releases/download/v0.2.3/goff-linux-amd64-v0.2.3
+          chmod +x /usr/local/bin/goff
+          goff
+
+      - name: Generate ArgoCD Diffs for Preview
+        run: |
+          # Allow access to Argo
+          while true; do
+            status=$(kubectl get pod -n argocd -l app.kubernetes.io/name=argocd-repo-server -o jsonpath='{.items[0].status.phase}')
+            if [ "$status" == "Running" ]; then
+              # TODO: Figure out how to background when there is no tty so we can see goff commands run
+              kubectl port-forward svc/argocd-repo-server -n argocd 8081 &
+              break
+            else
+              echo "Waiting for argocd-repo-server to be running..."
+              sleep 5
+            fi
+          done
+
+          # Wait for port-forward to be ready
+          sleep 5
+
+          # Source
+          goff argocd app "./source/infrastructure/reloader.yaml" --repo-server="localhost:8081" --output-dir=/tmp/source/
+
+          # Destination
+          goff argocd app "./target/infrastructure/reloader.yaml" --repo-server="localhost:8081" --output-dir=/tmp/target/
+
+          # Diff
+          goff diff "/tmp/source" "/tmp/target" --output-dir .
+
+      - name: comment PR
+        uses: machine-learning-apps/pr-comment@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          path: diff.md
+
+      # TODO: Automatically merge PR if no changes
+
+      # TODO: Hide/delete old diff comments when new diff is created
