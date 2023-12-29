@@ -15,8 +15,6 @@ permissions:
 
 jobs:
   diff:
-    container:
-      image: quay.io/puzzle/goff:latest
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source
@@ -41,6 +39,11 @@ jobs:
           kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
           # TODO: Use kubectl wait command for resources to be ready
           sleep 10
+
+      - name: Install Goff
+        run: |
+          curl -sSL -o /usr/local/bin/goff https://github.com/puzzle/goff/releases/download/v0.2.3/goff-linux-amd64-v0.2.3
+          chmod +x /usr/local/bin/goff
 
       - name: Generate ArgoCD Diffs for Preview
         run: |
