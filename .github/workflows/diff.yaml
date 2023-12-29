@@ -49,7 +49,7 @@ jobs:
       - name: Generate ArgoCD Diffs for Preview
         run: |
           # Allow access to Argo
-          # kubectl port-forward svc/argocd-repo-server -n argocd 8081
+          kubectl port-forward svc/argocd-repo-server -n argocd 8081
 
           # Source
           # helm template mychart ./source/helm/mychart --output-dir /tmp/source/out
