@@ -5,20 +5,22 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
   labels:
-    component: infrastructure
-  name: oauth2-proxy
+    component: system
+  name: argocd-image-updater
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: infrastructure
   source:
-    chart: oauth2-proxy
-    repoURL: https://oauth2-proxy.github.io/manifests
-    targetRevision: 6.23.1
+    chart: argocd-image-updater
+    repoURL: https://argoproj.github.io/argo-helm
+    targetRevision: 0.9.1
+    helm:
+      releaseName: argocd-image-updater
   destination:
-    server: https://kubernetes.default.svc
-    namespace: infrastructure
+    server: "https://kubernetes.default.svc"
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true

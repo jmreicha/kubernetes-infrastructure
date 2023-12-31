@@ -8,7 +8,7 @@ according to best practices.
 The configs are split into different parts, which can be deployed separately:
 
 - bootstrap: required ArgoCD configs for configuration.
-- infrastructure: core infrastructure pieces that should be deployed into every cluster.
+- system: core system infrastructure to be deployed into every cluster.
 - monitoring: monitoring configuration for the cluster.
 - network: network configuration for the cluster.
 - security: security configuration for the cluster.
@@ -45,7 +45,7 @@ kubectl get appprojects -A
 Deploy the rest of the infrastructure pieces.
 
 ```bash
-kubectl apply -f infrastructure
+kubectl apply -f system
 kubectl apply -f monitoring
 kubectl apply -f network
 kubectl apply -f security

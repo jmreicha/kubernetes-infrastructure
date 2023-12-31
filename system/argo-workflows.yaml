@@ -5,28 +5,24 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
   labels:
-    component: infrastructure
-  name: cert-manager
+    component: system
+  name: argo-workflows
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: infrastructure
   source:
-    chart: cert-manager
-    repoURL: https://charts.jetstack.io
-    targetRevision: v1.13.3
+    chart: argo-workflows
+    repoURL: https://argoproj.github.io/argo-helm
+    targetRevision: 0.40.3
     helm:
-      releaseName: cert-manager
-      parameters:
-        - name: installCRDs
-          value: "true"
+      releaseName: argo-workflows
   destination:
     server: "https://kubernetes.default.svc"
-    namespace: infrastructure
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true

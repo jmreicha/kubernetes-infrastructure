@@ -5,17 +5,17 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
   labels:
-    component: infrastructure
-  name: gemini
+    component: system
+  name: k8up
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: infrastructure
   source:
-    chart: gemini # Volume snapshot backups
-    repoURL: https://charts.fairwinds.com/stable
-    targetRevision: 2.1.3
+    chart: k8up # Object storage backups
+    repoURL: https://k8up-io.github.io/k8up
+    targetRevision: 4.4.3
   destination:
     server: "https://kubernetes.default.svc"
     namespace: infrastructure

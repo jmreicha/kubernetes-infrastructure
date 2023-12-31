@@ -5,24 +5,28 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
   labels:
-    component: infrastructure
-  name: argo-events
+    component: system
+  name: cert-manager
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: infrastructure
   source:
-    chart: argo-events
-    repoURL: https://argoproj.github.io/argo-helm
-    targetRevision: 2.4.1
+    chart: cert-manager
+    repoURL: https://charts.jetstack.io
+    targetRevision: v1.13.3
     helm:
-      releaseName: argo-events
+      releaseName: cert-manager
+      parameters:
+        - name: installCRDs
+          value: "true"
   destination:
     server: "https://kubernetes.default.svc"
-    namespace: argocd
+    namespace: infrastructure
   syncPolicy:
     automated:
       prune: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true

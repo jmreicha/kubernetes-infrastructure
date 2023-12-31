@@ -3,24 +3,24 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-wave: "1"
   labels:
-    component: infrastructure
-  name: reloader
+    component: system
+  name: argo-rollouts
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: infrastructure
   source:
-    chart: reloader
-    repoURL: https://stakater.github.io/stakater-charts
-    targetRevision: 1.0.58
+    chart: argo-rollouts
+    repoURL: https://argoproj.github.io/argo-helm
+    targetRevision: 2.34.0
     helm:
-      releaseName: reloader
+      releaseName: argo-rollouts
   destination:
     server: "https://kubernetes.default.svc"
-    namespace: infrastructure
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true
