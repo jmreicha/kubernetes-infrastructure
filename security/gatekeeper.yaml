@@ -17,7 +17,6 @@ spec:
     repoURL: https://open-policy-agent.github.io/gatekeeper/charts
     targetRevision: "3.14.0"
     helm:
-      releaseName: gatekeeper
       values: |
         enableRuntimeDefaultSeccompProfile: false
         postInstall:

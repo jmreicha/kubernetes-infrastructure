@@ -17,7 +17,6 @@ spec:
     repoURL: https://charts.deliveryhero.io/
     targetRevision: 2.3.11
     helm:
-      releaseName: node-problem-detector
       values: |
         metrics:
           enabled: true

@@ -7,7 +7,7 @@ setup() {
 
 @test "verify 'system' install dry-run works" {
     run kubectl apply -f system --dry-run=server
-    [ "$status" -eq 0 ]
+    assert_success
 }
 
 @test "verify the argo custom resources were deployed" {

@@ -16,8 +16,6 @@ spec:
     chart: argo-workflows
     repoURL: https://argoproj.github.io/argo-helm
     targetRevision: 0.40.3
-    helm:
-      releaseName: argo-workflows
   destination:
     server: "https://kubernetes.default.svc"
     namespace: argocd
