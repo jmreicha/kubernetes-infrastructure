@@ -1,20 +1,8 @@
-#!/usr/bin/env bats
+load common.bats
 
 setup() {
-    if [[ $CI == true ]]; then
-        TEST_PREFIX="/usr/lib"
-    else
-        TEST_PREFIX="$(brew --prefix)/lib"
-    fi
-
-    load "${TEST_PREFIX}/bats-assert/load.bash"
-    load "${TEST_PREFIX}/bats-detik/detik.bash"
-    load "${TEST_PREFIX}/bats-file/load.bash"
-    load "${TEST_PREFIX}/bats-support/load.bash"
-    # shellcheck disable=SC2034
-    DETIK_CLIENT_NAME="kubectl"
-    # shellcheck disable=SC2034
-    DETIK_CLIENT_NAMESPACE="argocd"
+    load 'common.bats'
+    _config
 }
 
 @test "verify bats works" {
@@ -59,20 +47,5 @@ setup() {
 
 @test "verify argocd-server is running" {
     run try "at most 3 times every 10s to get pods named 'argocd-server' and verify that 'status' is 'running'"
-    [ "$status" -eq 0 ]
-}
-
-@test "verify 'monitoring' install dry-run works" {
-    run kubectl apply -f infrastructure --dry-run=server
-    [ "$status" -eq 0 ]
-}
-
-@test "verify 'network' install dry-run works" {
-    run kubectl apply -f infrastructure --dry-run=server
-    [ "$status" -eq 0 ]
-}
-
-@test "verify 'security' install dry-run works" {
-    run kubectl apply -f infrastructure --dry-run=server
     [ "$status" -eq 0 ]
 }

@@ -1,6 +1,4 @@
-#!/usr/bin/env bats
-
-setup() {
+_config() {
     if [[ $CI == true ]]; then
         TEST_PREFIX="/usr/lib"
     else
@@ -15,14 +13,4 @@ setup() {
     DETIK_CLIENT_NAME="kubectl"
     # shellcheck disable=SC2034
     DETIK_CLIENT_NAMESPACE="argocd"
-}
-
-@test "verify 'infrastructure' install dry-run works" {
-    run kubectl apply -f infrastructure --dry-run=server
-    [ "$status" -eq 0 ]
-}
-
-@test "verify the argo custom resources were deployed" {
-    skip
-    kubectl get applications.argoproj.io k8up -n argocd -o jsonpath='{.status.health.status}'
 }

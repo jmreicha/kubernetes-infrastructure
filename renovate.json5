@@ -6,7 +6,7 @@
     ],
     "argocd": {
         "fileMatch": [
-            "infrastructure/.+\\.yaml$",
+            "system/.+\\.yaml$",
             "monitoring/.+\\.yaml$",
             "network/.+\\.yaml$",
             "security/.+\\.yaml$"
