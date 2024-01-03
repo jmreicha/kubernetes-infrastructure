@@ -30,7 +30,6 @@
             "groupName": "auto-update",
             "ignoreTests": true,
             "managers": [
-                "argocd",
                 "pre-commit"
             ],
             "matchUpdateTypes": [
