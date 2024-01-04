@@ -5,6 +5,10 @@ setup() {
     _config
 }
 
+teardown_file() {
+    kubectl delete -f bootstrap
+}
+
 @test "verify bats works" {
     run true
     assert_success
@@ -12,6 +16,34 @@ setup() {
 
 @test "verify cluster connectivity works" {
     run kubectl get pods -A
+    assert_success
+}
+
+@test "verify argocd app projects are created" {
+    run kubectl apply -f bootstrap
+    assert_success
+
+    run kubectl get appprojects -A
+    assert_success
+}
+
+@test "verify system appproject is created" {
+    run kubectl get appprojects system -n argocd
+    assert_success
+}
+
+@test "verify monitoring appproject is created" {
+    run kubectl get appprojects system -n argocd
+    assert_success
+}
+
+@test "verify network appproject is created" {
+    run kubectl get appprojects system -n argocd
+    assert_success
+}
+
+@test "verify security appproject is created" {
+    run kubectl get appprojects system -n argocd
     assert_success
 }
 
