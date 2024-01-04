@@ -20,6 +20,7 @@ spec:
     # - "!https://gitlab.com/group/**"
     # Any other repo is fine though
     - "*"
+
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
