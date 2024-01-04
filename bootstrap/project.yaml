@@ -4,7 +4,7 @@ kind: AppProject
 metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
-  name: infrastructure
+  name: system
   namespace: argocd
 spec:
   clusterResourceWhitelist:
