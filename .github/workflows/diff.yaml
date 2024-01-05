@@ -68,10 +68,17 @@ jobs:
           # Destination
           goff argocd app "./target" --repo-server="localhost:8081" --output-dir=/tmp/target/
 
+          # Clea up manifest output for simpler diffs
+          sed -i "/helm.sh\/chart/d" /tmp/target/*
+          sed -i "/app.kubernetes.io\/version/d" /tmp/target/*
+
           # Diff
           goff diff "/tmp/source" "/tmp/target" --output-dir .
 
+      # TODO: Run lints and other security checks after the templates have been rendered
+
       - name: comment PR
+        # TODO: Skip if diff.md is empty
         uses: machine-learning-apps/pr-comment@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

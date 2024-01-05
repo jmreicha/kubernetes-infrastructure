@@ -58,3 +58,4 @@ You can run `bats tests` from the root of the repo to run all tests.
 - [ ] More tests for PRs.
 - [ ] Look into how hard it would be to automate/template out new applications.
 - [ ] Bootstrap Argo to be managed with Argo.
+- [ ] Set up automerge or gitmerge.
