@@ -69,13 +69,17 @@ jobs:
           goff argocd app "./target" --repo-server="localhost:8081" --output-dir=/tmp/target/
 
           # Clea up non-actionalble manifest changes for simpler diffs
-          sed -i "/ca.crt/d" /tmp/source/*
-          sed -i "/caBundler/d" /tmp/source/*
+          sed -i "/ca.crt:/d" /tmp/source/*
+          sed -i "/caBundler:/d" /tmp/source/*
+          sed -i "/tls.crt:/d" /tmp/source/*
+          sed -i "/tls.key:/d" /tmp/source/*
           sed -i "/helm.sh\/chart/d" /tmp/source/*
           sed -i "/app.kubernetes.io\/version/d" /tmp/source/*
 
-          sed -i "/ca.crt/d" /tmp/source/*
-          sed -i "/caBundler/d" /tmp/source/*
+          sed -i "/ca.crt:/d" /tmp/source/*
+          sed -i "/caBundler:/d" /tmp/source/*
+          sed -i "/tls.crt:/d" /tmp/source/*
+          sed -i "/tls.key:/d" /tmp/source/*
           sed -i "/helm.sh\/chart/d" /tmp/target/*
           sed -i "/app.kubernetes.io\/version/d" /tmp/target/*
 
