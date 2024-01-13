@@ -88,12 +88,10 @@ jobs:
 
       # TODO: Run lints and other security checks after the templates have been rendered
 
-      - name: comment PR
-        uses: machine-learning-apps/pr-comment@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: PR comment with file
+        uses: thollander/actions-comment-pull-request@v2
         with:
-          path: diff.md
+          filePath: diff.md
 
       # TODO: Automatically merge PR if no changes
 
