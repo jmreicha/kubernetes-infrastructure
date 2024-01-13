@@ -76,10 +76,10 @@ jobs:
           sed -i "/helm.sh\/chart/d" /tmp/source/*
           sed -i "/app.kubernetes.io\/version/d" /tmp/source/*
 
-          sed -i "/ca.crt:/d" /tmp/source/*
-          sed -i "/caBundler:/d" /tmp/source/*
-          sed -i "/tls.crt:/d" /tmp/source/*
-          sed -i "/tls.key:/d" /tmp/source/*
+          sed -i "/ca.crt:/d" /tmp/target/*
+          sed -i "/caBundler:/d" /tmp/target/*
+          sed -i "/tls.crt:/d" /tmp/target/*
+          sed -i "/tls.key:/d" /tmp/target/*
           sed -i "/helm.sh\/chart/d" /tmp/target/*
           sed -i "/app.kubernetes.io\/version/d" /tmp/target/*
 
