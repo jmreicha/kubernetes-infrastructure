@@ -20,7 +20,7 @@
     "labels": [
         "dependencies"
     ],
-    "minimumReleaseAge": "3",
+    "minimumReleaseAge": "3 days",
     "packageRules": [
         {
             "automerge": true,
