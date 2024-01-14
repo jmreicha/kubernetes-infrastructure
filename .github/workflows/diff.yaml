@@ -68,7 +68,7 @@ jobs:
           # Destination
           goff argocd app "./target" --repo-server="localhost:8081" --output-dir=/tmp/target/
 
-          # Clea up non-actionalble manifest changes for simpler diffs
+          # Clean up non-actionalble manifest changes for simpler diffs
           sed -i "/ca.crt:/d" /tmp/source/*
           sed -i "/caBundle:/d" /tmp/source/*
           sed -i "/tls.crt:/d" /tmp/source/*
@@ -86,13 +86,22 @@ jobs:
           # Diff
           goff diff "/tmp/source" "/tmp/target" --output-dir .
 
-      # TODO: Run lints and other security checks after the templates have been rendered
+      # TODO: Run other lints and security checks after the templates have been rendered
 
       - name: PR comment with file
         uses: thollander/actions-comment-pull-request@v2
         with:
           filePath: diff.md
 
-      # TODO: Automatically merge PR if no changes
-
       # TODO: Hide/delete old diff comments when new diff is created
+
+  autoapprove:
+    name: Auto Approve Renovate PRs
+    needs: diff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto approve
+        uses: hmarr/auto-approve-action@44888193675f29a83e04faf4002fa8c0b537b1e4 # v3.2.1
+        if: github.actor == 'renovatebot' || github.actor == 'renovate[bot]'
+        with:
+          github-token: ${{ secrets.CI_GITHUB_TOKEN }}
