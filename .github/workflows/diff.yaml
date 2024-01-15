@@ -69,31 +69,35 @@ jobs:
           goff argocd app "./target" --repo-server="localhost:8081" --output-dir=/tmp/target/
 
           # Clean up non-actionalble manifest changes for simpler diffs
-          sed -i "/ca.crt:/d" /tmp/source/*
-          sed -i "/caBundle:/d" /tmp/source/*
-          sed -i "/tls.crt:/d" /tmp/source/*
-          sed -i "/tls.key:/d" /tmp/source/*
-          sed -i "/helm.sh\/chart/d" /tmp/source/*
-          sed -i "/app.kubernetes.io\/version/d" /tmp/source/*
+          matches=(
+            "ca.crt:"
+            "caBundle:"
+            "tls.crt:"
+            "tls.key:"
+            "helm.sh\/chart"
+            "app.kubernetes.io\/version"
+          )
 
-          sed -i "/ca.crt:/d" /tmp/target/*
-          sed -i "/caBundle:/d" /tmp/target/*
-          sed -i "/tls.crt:/d" /tmp/target/*
-          sed -i "/tls.key:/d" /tmp/target/*
-          sed -i "/helm.sh\/chart/d" /tmp/target/*
-          sed -i "/app.kubernetes.io\/version/d" /tmp/target/*
+          for match in "${matches[@]}"; do
+            sed -i "/$match/d" /tmp/source/*
+            sed -i "/$match/d" /tmp/target/*
+          done
 
           # Diff
           goff diff "/tmp/source" "/tmp/target" --output-dir .
 
       # TODO: Run other lints and security checks after the templates have been rendered
 
+      - name: Remove previous comments
+        uses: aki77/delete-pr-comments-action@v2
+        with:
+          bodyContains: |-
+            # 🔍 Preview
+
       - name: PR comment with file
         uses: thollander/actions-comment-pull-request@v2
         with:
           filePath: diff.md
-
-      # TODO: Hide/delete old diff comments when new diff is created
 
   autoapprove:
     name: Auto Approve Renovate PRs
@@ -105,3 +109,16 @@ jobs:
         if: github.actor == 'renovatebot' || github.actor == 'renovate[bot]'
         with:
           github-token: ${{ secrets.CI_GITHUB_TOKEN }}
+
+  # automerge:
+  #   name: Auto Merge Renovate PRs
+  #   needs: autoapprove
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Auto merge
+  #       uses: pascalgn/automerge-action@22948e0bc22f0aa673800da838595a3e7347e584 # v0.15.6
+  #       if: github.actor == 'renovatebot' || github.actor == 'renovate[bot]'
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
+  #         MERGE_LABELS: dependencies
+  #         MERGE_METHOD: rebase
