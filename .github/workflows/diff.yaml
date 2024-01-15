@@ -91,6 +91,7 @@ jobs:
       - name: Remove previous comments
         uses: aki77/delete-pr-comments-action@v2
         with:
+          token: ${{ secrets.CI_GITHUB_TOKEN }}
           bodyContains: |-
             # 🔍 Preview
 
