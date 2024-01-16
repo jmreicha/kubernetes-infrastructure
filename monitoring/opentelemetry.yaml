@@ -15,7 +15,7 @@ spec:
   source:
     chart: opentelemetry-operator
     repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
-    targetRevision: 0.45.0
+    targetRevision: 0.45.2
   destination:
     server: https://kubernetes.default.svc
     namespace: infrastructure
