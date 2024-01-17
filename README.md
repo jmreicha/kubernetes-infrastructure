@@ -1,14 +1,15 @@
 # Kubernetes Infrastructure
 
-Declarative (and slightly opinionated) infrastructure for Kubernetes. This set
-of resources intends to provide a batteries-included set of self-updating
+Declarative (and slightly opinionated) infrastructure for Kubernetes. This repo
+intends to provide a full set of batteries-included and self-updating
 infrastructure that can be used for configuring and securing Kubernetes clusters
-according to best practices.
+according to best practices. Each change is fully tested before it is 
+automatically merged into the main branch.
 
-The configs are split into different parts, which can be deployed separately:
+The configs are split into different components, which can be deployed separately:
 
 - bootstrap: required ArgoCD configs for configuration.
-- system: core system infrastructure to be deployed into every cluster.
+- system: core system infrastructure to be deployed for the cluster.
 - monitoring: monitoring configuration for the cluster.
 - network: network configuration for the cluster.
 - security: security configuration for the cluster.
@@ -16,7 +17,9 @@ The configs are split into different parts, which can be deployed separately:
 > [!NOTE]
 > These configs all assume deployment with ArgoCD.
 
-## Bootstrap configs with ArgoCD
+## Running Locally
+
+### Bootstrap configs with ArgoCD
 
 To bootstrap and deploy the configurations, we first need to install ArgoCD. You
 can do this with a local Kubernetes cluster to test.
@@ -51,7 +54,19 @@ kubectl apply -f network
 kubectl apply -f security
 ```
 
+### Testing
+
 You can run `bats tests` from the root of the repo to run all tests.
+
+```bash
+bats tests
+```
+
+Or you can target individual tests for each component.
+
+```bash
+bats tests/test_system.bats
+```
 
 ## TODO
 
