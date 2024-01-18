@@ -99,27 +99,3 @@ jobs:
         uses: thollander/actions-comment-pull-request@v2
         with:
           filePath: diff.md
-
-  autoapprove:
-    name: Auto Approve Renovate PRs
-    needs: diff
-    runs-on: ubuntu-latest
-    steps:
-      - name: Auto approve
-        uses: hmarr/auto-approve-action@44888193675f29a83e04faf4002fa8c0b537b1e4 # v3.2.1
-        if: github.actor == 'renovatebot' || github.actor == 'renovate[bot]'
-        with:
-          github-token: ${{ secrets.CI_GITHUB_TOKEN }}
-
-  # automerge:
-  #   name: Auto Merge Renovate PRs
-  #   needs: autoapprove
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Auto merge
-  #       uses: pascalgn/automerge-action@22948e0bc22f0aa673800da838595a3e7347e584 # v0.15.6
-  #       if: github.actor == 'renovatebot' || github.actor == 'renovate[bot]'
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
-  #         MERGE_LABELS: dependencies
-  #         MERGE_METHOD: rebase
