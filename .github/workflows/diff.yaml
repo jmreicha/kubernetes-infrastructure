@@ -8,6 +8,7 @@ on:
       - "monitoring/**"
       - "network/**"
       - "security/**"
+      - "system/**"
 
 permissions:
   contents: read
