@@ -19,18 +19,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
         with:
           path: source
 
       - name: Checkout Target PR
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
         with:
           path: target
           ref: ${{ github.event.pull_request.base.ref }}
 
       - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1.8.0
+        uses: helm/kind-action@dda0770415bac9fc20092cacbc54aa298604d140 # v1.8.0
         with:
           cluster_name: "testing-cluster"
 
@@ -90,13 +90,13 @@ jobs:
       # TODO: Run other lints and security checks after the templates have been rendered
 
       - name: Remove previous comments
-        uses: aki77/delete-pr-comments-action@v2
+        uses: aki77/delete-pr-comments-action@83124b1ec3ab34188a0eb806e9d9c683a2b1da7c # v2
         with:
           token: ${{ secrets.CI_GITHUB_TOKEN }}
           bodyContains: |-
             Preview
 
       - name: PR comment with file
-        uses: thollander/actions-comment-pull-request@v2
+        uses: thollander/actions-comment-pull-request@1d3973dc4b8e1399c0620d3f2b1aa5e795465308 # v2
         with:
           filePath: diff.md
