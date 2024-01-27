@@ -10,7 +10,7 @@ teardown_file() {
 }
 
 @test "verify bats works" {
-    run true
+    run false
     assert_success
 }
 

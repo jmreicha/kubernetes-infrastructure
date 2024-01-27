@@ -46,15 +46,15 @@ jobs:
         with:
           github-token: ${{ secrets.CI_GITHUB_TOKEN }}
 
-  automerge:
-    name: Auto Merge Renovate PRs
-    needs: autoapprove
-    runs-on: ubuntu-latest
-    steps:
-      - name: Auto merge
-        uses: pascalgn/automerge-action@58724c982461efbb7865b3762d7bff0d4756f57a # v0.16.2
-        if: github.actor == 'renovatebot' || github.actor == 'renovate[bot]'
-        env:
-          GITHUB_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
-          MERGE_LABELS: dependencies
-          MERGE_METHOD: rebase
+  # automerge:
+  #   name: Auto Merge Renovate PRs
+  #   needs: autoapprove
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Auto merge
+  #       uses: pascalgn/automerge-action@58724c982461efbb7865b3762d7bff0d4756f57a # v0.16.2
+  #       if: github.actor == 'renovatebot' || github.actor == 'renovate[bot]'
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
+  #         MERGE_LABELS: dependencies
+  #         MERGE_METHOD: rebase
