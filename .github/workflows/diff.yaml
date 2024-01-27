@@ -73,6 +73,7 @@ jobs:
           matches=(
             "ca.crt:"
             "caBundle:"
+            "checksum\/config:"
             "tls.crt:"
             "tls.key:"
             "helm.sh\/chart"
@@ -90,11 +91,11 @@ jobs:
       # TODO: Run other lints and security checks after the templates have been rendered
 
       - name: Remove previous comments
-        uses: aki77/delete-pr-comments-action@83124b1ec3ab34188a0eb806e9d9c683a2b1da7c # v2
+        uses: int128/hide-comment-action@v1
         with:
-          token: ${{ secrets.CI_GITHUB_TOKEN }}
-          bodyContains: |-
-            Preview
+          authors: |
+            github-actions
+            github-actions[bot]
 
       - name: PR comment with file
         uses: thollander/actions-comment-pull-request@1d3973dc4b8e1399c0620d3f2b1aa5e795465308 # v2
