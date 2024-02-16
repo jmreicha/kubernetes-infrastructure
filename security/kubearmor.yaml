@@ -15,7 +15,7 @@ spec:
   source:
     chart: kubearmor
     repoURL: https://kubearmor.github.io/charts
-    targetRevision: v1.2.0
+    targetRevision: v1.2.1
   destination:
     server: "https://kubernetes.default.svc"
     namespace: infrastructure
