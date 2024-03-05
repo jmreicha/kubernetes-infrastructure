@@ -15,7 +15,7 @@ spec:
   source:
     chart: argocd-image-updater
     repoURL: https://argoproj.github.io/argo-helm
-    targetRevision: 0.9.4
+    targetRevision: 0.9.5
   destination:
     server: "https://kubernetes.default.svc"
     namespace: argocd
