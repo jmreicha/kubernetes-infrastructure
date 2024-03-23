@@ -15,7 +15,7 @@ spec:
   source:
     chart: k8up # Object storage backups
     repoURL: https://k8up-io.github.io/k8up
-    targetRevision: 4.4.3
+    targetRevision: 4.5.0
   destination:
     server: "https://kubernetes.default.svc"
     namespace: infrastructure
