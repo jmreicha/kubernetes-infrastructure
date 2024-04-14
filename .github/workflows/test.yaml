@@ -21,13 +21,13 @@ jobs:
           chmod +x /usr/local/bin/argocd
           argocd version --client
 
-      - name: Setup Bats and Bats Libs
-        uses: bats-core/setup-bats-libs@0ae349dad1aa69308725a48b91b5d6ca647040bc # 1.5.6
-
       - name: Bootstrap ArgoCD
         run: |
           kubectl create namespace argocd
           kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+      - name: Setup Bats and Bats Libs
+        uses: bats-core/bats-action@2.0.0
 
       - name: Run Tests
         run: |

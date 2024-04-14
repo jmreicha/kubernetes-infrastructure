@@ -3,7 +3,7 @@
 Declarative (and slightly opinionated) infrastructure for Kubernetes. This repo
 intends to provide a full set of batteries-included and self-updating
 infrastructure that can be used for configuring and securing Kubernetes clusters
-according to best practices. Each change is fully tested before it is 
+according to best practices. Each change is fully tested before it is
 automatically merged into the main branch.
 
 The configs are split into different components, which can be deployed separately:
@@ -55,6 +55,17 @@ kubectl apply -f security
 ```
 
 ### Testing
+
+Install the required bats libraries.
+
+```bash
+# Debian
+sudo apt install bats bats-support bats-assert bats-file
+# OSX
+brew install bats-core
+brew tap bats-core/bats-core
+brew install bats-support bats-assert bats-file bats-detik
+```
 
 You can run `bats tests` from the root of the repo to run all tests.
 
