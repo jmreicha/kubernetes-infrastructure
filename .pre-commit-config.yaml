@@ -10,7 +10,7 @@ repos:
         types: [file, yaml]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v4.6.0
     hooks:
       - id: trailing-whitespace
       - id: check-merge-conflict
@@ -24,7 +24,7 @@ repos:
       - id: kube-linter-system
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v3.20.0
+    rev: v3.22.0
     hooks:
       - id: commitizen
         stages: [commit-msg]
