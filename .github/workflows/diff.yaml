@@ -63,10 +63,10 @@ jobs:
           # Wait for port-forward to be ready
           sleep 5
 
-          # Source
+          echo "Generating source configs"
           goff argocd app "./source" --repo-server="localhost:8081" --output-dir=/tmp/source/
 
-          # Destination
+          echo "Generating target configs"
           goff argocd app "./target" --repo-server="localhost:8081" --output-dir=/tmp/target/
 
           # Clean up non-actionalble manifest changes for simpler diffs
@@ -85,7 +85,7 @@ jobs:
             sed -i "/$match/d" /tmp/target/*
           done
 
-          # Diff
+          echo "Diffing source and target configs"
           goff diff "/tmp/source" "/tmp/target" --output-dir .
 
       # TODO: Run other lints and security checks after the templates have been rendered
