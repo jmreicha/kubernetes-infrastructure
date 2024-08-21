@@ -15,7 +15,7 @@ spec:
   source:
     chart: opentelemetry-operator
     repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
-    targetRevision: 0.67.0
+    targetRevision: 0.68.0
     helm:
       values: |
         # Disable webhooks in CI because they require cert-manager cert which is not available
