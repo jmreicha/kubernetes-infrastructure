@@ -15,7 +15,7 @@ spec:
   source:
     chart: gatekeeper
     repoURL: https://open-policy-agent.github.io/gatekeeper/charts
-    targetRevision: "3.17.0"
+    targetRevision: "3.17.1"
     helm:
       values: |
         enableRuntimeDefaultSeccompProfile: false
