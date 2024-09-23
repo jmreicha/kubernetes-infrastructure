@@ -15,7 +15,7 @@ spec:
   source:
     chart: oauth2-proxy
     repoURL: https://oauth2-proxy.github.io/manifests
-    targetRevision: 7.7.20
+    targetRevision: 7.7.21
   destination:
     server: https://kubernetes.default.svc
     namespace: infrastructure
