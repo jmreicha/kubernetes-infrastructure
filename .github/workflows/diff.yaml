@@ -91,7 +91,7 @@ jobs:
       # TODO: Run other lints and security checks after the templates have been rendered
 
       - name: Remove previous comments
-        uses: int128/hide-comment-action@850168a162175291c7f4e75f8a223fb4d23402a2 # v1
+        uses: int128/hide-comment-action@a30d551065e4231e6d7a671bb5ce884f9ee6417b # v1
         with:
           authors: |
             github-actions
