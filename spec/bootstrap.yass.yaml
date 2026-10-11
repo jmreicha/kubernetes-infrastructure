@@ -13,16 +13,20 @@ INPUT:
 - MUST: "accept read access to 1Password through `op`, for the Secrets seeded by SecretSeed"
   SEE: SecretSeed
 RETURN:
+- MUST: complete only when every node reports Ready and the argo-cd and cilium Applications are Synced and Healthy, which means Argo CD has adopted both Helm releases
+- MUST: guarantee on completion that every Secret listed by SecretSeed exists
+  CONFORMS: SecretSeed::RETURN
+- MUST: guarantee on completion that the AppProjects and the core root Application have been applied
+SIDE-EFFECT:
 - MUST: "install Cilium with `helm install`, at the catalog version, with kubeProxyReplacement enabled, Hubble enabled, and k8sServiceHost/k8sServicePort from apiServerHost/apiServerPort"
 - WHEN: provider is eks
-  MUST: install Cilium in ENI IPAM mode, replacing the AWS VPC CNI
+  MUST: install Cilium in ENI IPAM mode and remove the AWS VPC CNI (the aws-node DaemonSet)
 - WHEN: provider is baremetal
   MUST: install Cilium with LB-IPAM enabled over lbIpPool, L2 announcements enabled, and the Talos cgroup and capability settings
 - MUST: "install Argo CD with `helm install` after every node reports Ready"
-- MUST: seed every bootstrap Secret before any core Application is applied
-  CONFORMS: SecretSeed
-- MUST: apply the AppProjects and the core root Application
-- MUST: complete only when the argo-cd and cilium Applications are Synced and Healthy, which means Argo CD has adopted both Helm releases
+- MUST: seed every Secret before any core Application is applied
+  SEE: SecretSeed
+- MUST: apply the AppProjects and the core root Application last
 ERROR:
 - WHEN: the kubeconfig context cannot reach the API server
   MUST: fail before installing anything, naming the context
@@ -44,13 +48,13 @@ INPUT:
 - MUST: "read each secret with `op read`, using the op:// reference named for it in the cluster values"
   CONFORMS: ./values@ClusterValues::INPUT
 RETURN:
-- MUST: "create the `onepassword` namespace and, in it, the Connect credentials and operator token Secrets the connect chart expects"
-- MUST: "create the `kargo` namespace and, in it, a Secret holding the Kargo admin password hash and token signing key, which the kargo Application reads instead of chart values"
+- MUST: "yield, in namespace `onepassword`, the Connect credentials and operator token Secrets the connect chart expects"
+- MUST: "yield, in namespace `kargo`, a Secret holding the Kargo admin password hash and token signing key, which the kargo Application reads instead of chart values"
 - WHEN: the cluster values carry a domain and provider is baremetal
-  MUST: "create the `external-dns` namespace and, in it, a Secret holding the Cloudflare API token"
-- MUST: create each Secret before the Application that reads it is applied
-- MUST: leave a Secret that already exists with the same data unchanged, so a re-run changes nothing
+  MUST: "yield, in namespace `external-dns`, a Secret holding the Cloudflare API token"
 SIDE-EFFECT:
+- MUST: create each namespace and Secret before the Application that reads it is applied
+- MUST: leave a Secret that already exists with the same data unchanged, so a re-run changes nothing
 - MUST-NOT: write any secret value to git, to a file, or to a log
 ERROR:
 - WHEN: "`op read` fails for any reference"

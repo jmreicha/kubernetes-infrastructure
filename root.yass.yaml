@@ -113,8 +113,8 @@ content: |
   opentelemetry-operator    opentelemetry-operator      https://open-telemetry.github.io/opentelemetry-helm-charts  opentelemetry         core      eks,baremetal    2
   kor                       kor                         https://yonahd.github.io/kor                                kor                   core      eks,baremetal    2
   kubechecks                kubechecks                  https://zapier.github.io/kubechecks                         kubechecks            core      eks,baremetal    2
-  strimzi                   strimzi-kafka-operator      https://strimzi.io/charts                                   strimzi               platform  baremetal        3
-  openeverest               openeverest                 https://openeverest.github.io/helm-charts                   everest-system        platform  baremetal        3
+  strimzi                   strimzi-kafka-operator      https://strimzi.io/charts                                   strimzi               platform  eks,baremetal    3
+  openeverest               openeverest                 https://openeverest.github.io/helm-charts                   everest-system        platform  eks,baremetal    3
   kubevirt                  kubevirt                    https://encircle360-oss.github.io/helm-charts               kubevirt              platform  baremetal        3
   cdi                       cdi                         https://encircle360-oss.github.io/helm-charts               cdi                   platform  baremetal        4
   crossplane                crossplane                  https://charts.crossplane.io/stable                         crossplane-system     platform  eks,baremetal    4
