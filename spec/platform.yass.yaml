@@ -16,6 +16,9 @@ RETURN:
 - MUST: complete only when every Application rendered by this layer is Synced and Healthy
 SIDE-EFFECT:
 - MUST: "render one Application for every catalog entry whose layer is `platform` and whose providers include the cluster's provider, in AppProject `platform`"
+- MUST: render no Application for a catalog entry named in the cluster values' disable list
+- WHEN: kubevirt is disabled
+  MUST: render no cdi Application, because CDI is installed only alongside KubeVirt
 - MUST: render no Application for any other catalog entry
 - MUST: install the Strimzi operator watching all namespaces, with no Kafka resources
 - MUST: install OpenEverest with its PostgreSQL, MySQL, and MongoDB operators and no database clusters

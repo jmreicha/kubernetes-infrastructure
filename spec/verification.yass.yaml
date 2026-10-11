@@ -1,0 +1,61 @@
+# yaml-language-server: $schema=https://textla.dev/yass/v1.schema.json
+---
+description: >
+  How a change to this repository is verified before merge, without a real cluster. Two
+  tiers: render (static checks over fully rendered manifests) and API (server-side
+  validation against a real kube-apiserver with no kubelet). End-to-end testing on a
+  Talos-in-Docker cluster, nightly and per pull request, is planned but not yet specified;
+  see docs/design.md.
+version: v1
+related:
+- https://github.com/yannh/kubeconform
+- https://github.com/CustomResourceDefinition/catalog
+- https://www.conftest.dev/
+- https://kwok.sigs.k8s.io/
+---
+spec: Verification
+INPUT:
+- MUST: "accept one fixture values file per provider, `tests/clusters/eks.yaml` and `tests/clusters/baremetal.yaml`, each with a domain set and nothing disabled"
+  CONFORMS: ./values@ClusterValues::INPUT
+- MUST: "accept one further fixture per provider with no domain and every platform-layer Application disabled, `tests/clusters/<provider>-minimal.yaml`"
+- MUST: run on every pull request, including Renovate pull requests that change a pinned version
+RETURN:
+- MUST: pass only when every check of both tiers passes for every fixture
+- MUST: on failure, report each failing check with the fixture, the Application, and the offending resource
+SIDE-EFFECT:
+- MUST-NOT: contact a real cluster, AWS, Cloudflare, or 1Password
+- MUST: delete every API-tier cluster it creates, whether the run passes or fails
+INVARIANT:
+- CONFORMS: Verification.Render
+- CONFORMS: Verification.Api
+---
+spec: Verification.Render
+INPUT:
+- MUST: "render the app-of-apps chart with `helm template` for each fixture and each layer"
+- MUST: "render each resulting Application's chart with `helm template` at its pinned version and with the values that Application passes"
+RETURN:
+- MUST: "pass only when kubeconform, in strict mode, accepts every rendered manifest, using the default schema location and the CustomResourceDefinition/catalog schemas at a pinned tag"
+- WHEN: no schema exists for a rendered custom resource in either location
+  MUST: skip that resource in this tier rather than fail, because the API tier validates it against the pinned chart's own CRD
+  SEE: Verification.Api
+- MUST: pass only when every conftest Rego policy under policy/ passes against every rendered manifest
+- MUST: "fail when the rendered Applications for a fixture are not exactly the catalog entries for its provider and layer, minus external-dns when it has no domain and minus its disabled entries"
+SIDE-EFFECT:
+- MUST: "pin the CustomResourceDefinition/catalog tag in the repository, where Renovate updates it like any other pin"
+- MUST: "provide Rego policies that fail on: a targetRevision that is not an exact version; a missing or out-of-order sync-wave; an Application in the wrong AppProject; an Application missing automated sync, prune, selfHeal, CreateNamespace, or ServerSideApply; a missing privileged PSA label on a baremetal namespace that requires one; an IRSA role annotation on eks; and a Secret with inline data in any rendered manifest"
+ERROR:
+- WHEN: a chart cannot be fetched at its pinned version
+  MUST: fail, naming the chart, repoURL, and version
+- MUST: fail and report the check that could not run
+---
+spec: Verification.Api
+INPUT:
+- CONFORMS: Verification.Render::INPUT
+- MUST: "create a kwok cluster (`kwokctl create cluster`) whose kube-apiserver version equals the fixture's `kubernetesVersion`"
+RETURN:
+- MUST: "pass only when, after applying every rendered CustomResourceDefinition, every other rendered manifest is accepted by `kubectl apply --dry-run=server`"
+- MUST: apply the manifests in sync-wave order, so a resource that needs a CRD from an earlier wave is validated against it
+ERROR:
+- WHEN: the kwok cluster cannot be created
+  MUST: fail, reporting the kwokctl error, with the API tier reported as failed rather than skipped
+- MUST: fail and report the manifest the API server rejected, with its error

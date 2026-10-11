@@ -12,7 +12,9 @@ INPUT:
 - MUST: "carry `provider`, exactly one of `eks` or `baremetal`"
 - MUST: "carry `apiServerHost` and `apiServerPort`, the address Cilium uses in place of kube-proxy"
 - MAY: "carry `domain`, the DNS zone external-dns manages; external-dns is installed only when it is present"
-- MUST: "carry `secretRefs.onepasswordCredentials`, `secretRefs.onepasswordToken`, `secretRefs.kargoAdminPasswordHash`, and `secretRefs.kargoTokenSigningKey`, each an op:// reference"
+- MUST: "carry `secretRefs.onepasswordCredentials` and `secretRefs.onepasswordToken`, each an op:// reference"
+- WHEN: kargo is not disabled
+  MUST: "carry `secretRefs.kargoAdminPasswordHash` and `secretRefs.kargoTokenSigningKey`, each an op:// reference"
 - WHEN: provider is baremetal and domain is present
   MUST: "carry `secretRefs.cloudflareApiToken`, an op:// reference"
 - WHEN: provider is eks
@@ -21,7 +23,11 @@ INPUT:
   MUST: "carry `lbIpPool`, a list of one or more CIDRs that Cilium LB-IPAM allocates LoadBalancer addresses from"
 - WHEN: provider is baremetal
   SHOULD: "set `apiServerHost` to `localhost` and `apiServerPort` to `7445`, the Talos KubePrism endpoint"
+- MUST: "carry `kubernetesVersion`, the cluster's Kubernetes minor version, such as `1.34`"
 - MAY: "carry `coreOnly: true`, which stops installation after the core layer"
+- MAY: "carry `disable`, a list of platform-layer catalog project names that are not installed on this cluster"
+- WHEN: "`disable` names a platform-layer project that the catalog does not offer for this provider"
+  MUST: accept it as having no effect
 RETURN:
 - MUST: yield the values passed to the apps/ chart for every layer of this cluster
 ERROR:
@@ -29,6 +35,8 @@ ERROR:
   MUST: be rejected, naming the missing key
 - WHEN: a key is present with the wrong type, provider is outside the accepted set, or a secretRefs value does not begin with op://
   MUST: be rejected, naming the key and the expected form
+- WHEN: "`disable` names a core or bootstrap project, or a name not in the catalog"
+  MUST: be rejected, naming the entry and listing the platform-layer names that may be disabled
 - WHEN: clusterName does not equal the file name stem
   MUST: be rejected, naming both values
 - MUST: be rejected, naming the offending key, for any key not listed in this spec

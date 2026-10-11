@@ -45,6 +45,8 @@ ERROR:
 SIDE-EFFECT:
 - MUST-NOT: write a secret value to git, to a log, or to any file in this repository
 INVARIANT:
+- MUST: pass Verification before any change to this repository merges
+  SEE: spec/verification@Verification
 - USES: GitOpsConventions
 - USES: Catalog
 ---
@@ -127,3 +129,4 @@ content: |
 
   The catalog is closed: no project outside this table is installed by this project.
   external-dns is optional: it is installed only when the cluster values carry a domain.
+  Every platform-layer entry is installed by default and may be disabled per cluster.

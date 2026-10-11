@@ -49,7 +49,8 @@ INPUT:
   CONFORMS: ./values@ClusterValues::INPUT
 RETURN:
 - MUST: "yield, in namespace `onepassword`, the Connect credentials and operator token Secrets the connect chart expects"
-- MUST: "yield, in namespace `kargo`, a Secret holding the Kargo admin password hash and token signing key, which the kargo Application reads instead of chart values"
+- WHEN: kargo is not disabled in the cluster values
+  MUST: "yield, in namespace `kargo`, a Secret holding the Kargo admin password hash and token signing key, which the kargo Application reads instead of chart values"
 - WHEN: the cluster values carry a domain and provider is baremetal
   MUST: "yield, in namespace `external-dns`, a Secret holding the Cloudflare API token"
 SIDE-EFFECT:
