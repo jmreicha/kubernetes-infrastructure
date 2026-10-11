@@ -1,0 +1,61 @@
+# yaml-language-server: $schema=https://textla.dev/yass/v1.schema.json
+---
+description: >
+  The core layer. Everything a cluster needs to function, be secure, and be observable
+  before any platform-layer Application runs on it.
+version: v1
+---
+spec: Core
+INPUT:
+- CONFORMS: ./bootstrap@Bootstrap::RETURN
+- MUST: rely on Argo CD and Cilium being Synced and Healthy without re-checking them
+- WHEN: Argo CD or Cilium is not Healthy when the core layer starts
+  MUST: let the core Applications fail to sync, and report the failure through Core ERROR
+RETURN:
+- MUST: "render one Application for every catalog entry whose layer is `core` and whose providers include the cluster's provider, in AppProject `core`"
+- WHEN: the cluster values carry no domain
+  MUST: render no external-dns Application
+- MUST: render no Application for any other catalog entry
+- MUST: complete when every rendered Application is Synced and Healthy
+- MUST: "install cert-manager with its CRDs (`crds.enabled=true`)"
+- MUST: install Gatekeeper with its controller and audit enabled and no constraints, because constraints are out of scope for this layer
+- MUST: install Falco with its default ruleset and the modern eBPF driver
+- MUST: install the OpenTelemetry operator with no OpenTelemetryCollector resources, because those are configuration
+ERROR:
+- WHEN: any core Application is not Synced and Healthy 30 minutes after the core root Application is applied
+  MUST: fail, naming every Application that is Degraded, OutOfSync, Missing, or Progressing
+- MUST: fail, report the failure, and leave the cluster as it stands
+INVARIANT:
+- MUST-NOT: install configuration objects such as ClusterIssuers, ClusterSecretStores, Gatekeeper constraints, Karpenter NodePools, or Falco custom rules
+---
+spec: Core.Eks
+INPUT:
+- CONFORMS: Core::INPUT
+- MUST: rely on EKS Pod Identity associations for Karpenter, the AWS Load Balancer Controller, the EBS CSI driver, and external-dns already existing, created outside the cluster
+RETURN:
+- CONFORMS: Core::RETURN
+- MUST: install Karpenter with settings.clusterName from clusterName
+- MUST: install the AWS Load Balancer Controller with clusterName, region, and vpcId
+- WHEN: the cluster values carry a domain
+  MUST: configure external-dns with the aws provider (Route53) and domainFilters set to domain
+- MUST-NOT: set an IRSA role annotation on any ServiceAccount
+ERROR:
+- WHEN: a Pod Identity association is missing and the controller cannot reach AWS
+  MUST: fail through Core ERROR, with the affected Application named as Degraded
+- CONFORMS: Core::ERROR
+---
+spec: Core.Baremetal
+INPUT:
+- CONFORMS: Core::INPUT
+- MUST: "rely on every node carrying the Talos `iscsi-tools` and `util-linux-tools` system extensions and the Longhorn kubelet extraMounts"
+RETURN:
+- CONFORMS: Core::RETURN
+- MUST: install Longhorn as the default StorageClass
+- WHEN: the cluster values carry a domain
+  MUST: configure external-dns with the cloudflare provider and domainFilters set to domain, reading the API token from the Secret seeded by SecretSeed
+  SEE: ./bootstrap@SecretSeed
+- MUST: "label the longhorn-system and falco namespaces `pod-security.kubernetes.io/enforce=privileged`"
+ERROR:
+- WHEN: a node lacks the Talos extensions Longhorn needs
+  MUST: fail through Core ERROR, with longhorn named as Degraded
+- CONFORMS: Core::ERROR

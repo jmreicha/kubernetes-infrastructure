@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://textla.dev/yass/v1.schema.json
+---
+description: >
+  The per-cluster values file. It is the only per-cluster input; every Application reads
+  cluster-specific settings from it, and nothing cluster-specific is hardcoded elsewhere.
+version: v1
+---
+spec: ClusterValues
+INPUT:
+- MUST: "be a YAML mapping at `clusters/<cluster-name>.yaml`"
+- MUST: "carry `clusterName`, a string equal to `<cluster-name>` in the file name"
+- MUST: "carry `provider`, exactly one of `eks` or `baremetal`"
+- MUST: "carry `apiServerHost` and `apiServerPort`, the address Cilium uses in place of kube-proxy"
+- MAY: "carry `domain`, the DNS zone external-dns manages; external-dns is installed only when it is present"
+- MUST: "carry `secretRefs.onepasswordCredentials`, `secretRefs.onepasswordToken`, `secretRefs.kargoAdminPasswordHash`, and `secretRefs.kargoTokenSigningKey`, each an op:// reference"
+- WHEN: provider is baremetal and domain is present
+  MUST: "carry `secretRefs.cloudflareApiToken`, an op:// reference"
+- WHEN: provider is eks
+  MUST: "carry `region` and `vpcId`"
+- WHEN: provider is baremetal
+  MUST: "carry `lbIpPool`, a list of one or more CIDRs that Cilium LB-IPAM allocates LoadBalancer addresses from"
+- WHEN: provider is baremetal
+  SHOULD: "set `apiServerHost` to `localhost` and `apiServerPort` to `7445`, the Talos KubePrism endpoint"
+- MAY: "carry `coreOnly: true`, which stops installation after the core layer"
+RETURN:
+- MUST: yield the values passed to the apps/ chart for every layer of this cluster
+ERROR:
+- WHEN: a required key is missing
+  MUST: be rejected, naming the missing key
+- WHEN: a key is present with the wrong type, provider is outside the accepted set, or a secretRefs value does not begin with op://
+  MUST: be rejected, naming the key and the expected form
+- WHEN: clusterName does not equal the file name stem
+  MUST: be rejected, naming both values
+- MUST: be rejected, naming the offending key, for any key not listed in this spec
+SIDE-EFFECT:
+- MUST-NOT: carry a secret value; it carries only op:// references, which SecretSeed resolves
+  SEE: ./bootstrap@SecretSeed

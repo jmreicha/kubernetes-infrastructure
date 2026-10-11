@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=https://textla.dev/yass/v1.schema.json
+---
+description: >
+  The bootstrap layer. The only imperative step in the project. It installs the CNI and
+  Argo CD so that every other layer can be delivered through GitOps, then hands both
+  releases to Argo CD.
+version: v1
+---
+spec: Bootstrap
+INPUT:
+- CONFORMS: ./values@ClusterValues::INPUT
+- MUST: accept a kubeconfig whose context points at the target cluster with cluster-admin rights
+- MUST: "accept read access to 1Password through `op`, for the Secrets seeded by SecretSeed"
+  SEE: SecretSeed
+RETURN:
+- MUST: "install Cilium with `helm install`, at the catalog version, with kubeProxyReplacement enabled, Hubble enabled, and k8sServiceHost/k8sServicePort from apiServerHost/apiServerPort"
+- WHEN: provider is eks
+  MUST: install Cilium in ENI IPAM mode, replacing the AWS VPC CNI
+- WHEN: provider is baremetal
+  MUST: install Cilium with LB-IPAM enabled over lbIpPool, L2 announcements enabled, and the Talos cgroup and capability settings
+- MUST: "install Argo CD with `helm install` after every node reports Ready"
+- MUST: seed every bootstrap Secret before any core Application is applied
+  CONFORMS: SecretSeed
+- MUST: apply the AppProjects and the core root Application
+- MUST: complete only when the argo-cd and cilium Applications are Synced and Healthy, which means Argo CD has adopted both Helm releases
+ERROR:
+- WHEN: the kubeconfig context cannot reach the API server
+  MUST: fail before installing anything, naming the context
+- WHEN: provider is eks and the aws-node DaemonSet cannot be removed
+  MUST: fail after installing nothing beyond Cilium, and report that the VPC CNI is still present
+- WHEN: provider is baremetal and any node runs kube-proxy or flannel
+  MUST: fail before installing Cilium, naming the nodes, because the Talos machine config must disable both
+- WHEN: nodes do not all report Ready within 10 minutes of installing Cilium
+  MUST: fail, naming the nodes that are not Ready
+- WHEN: Argo CD has not adopted both releases within 10 minutes
+  MUST: fail, naming the Application that is not Synced and Healthy
+- MUST: fail, report the failing step, and leave the cluster as it stands
+INVARIANT:
+- MUST-NOT: install any project other than Cilium and Argo CD imperatively
+- MUST: be safe to re-run against a cluster it has already bootstrapped, changing nothing that is already in the desired state
+---
+spec: SecretSeed
+INPUT:
+- MUST: "read each secret with `op read`, using the op:// reference named for it in the cluster values"
+  CONFORMS: ./values@ClusterValues::INPUT
+RETURN:
+- MUST: "create the `onepassword` namespace and, in it, the Connect credentials and operator token Secrets the connect chart expects"
+- MUST: "create the `kargo` namespace and, in it, a Secret holding the Kargo admin password hash and token signing key, which the kargo Application reads instead of chart values"
+- WHEN: the cluster values carry a domain and provider is baremetal
+  MUST: "create the `external-dns` namespace and, in it, a Secret holding the Cloudflare API token"
+- MUST: create each Secret before the Application that reads it is applied
+- MUST: leave a Secret that already exists with the same data unchanged, so a re-run changes nothing
+SIDE-EFFECT:
+- MUST-NOT: write any secret value to git, to a file, or to a log
+ERROR:
+- WHEN: "`op read` fails for any reference"
+  MUST: fail the bootstrap layer before any core Application is applied, naming the reference and never printing a value
+- MUST: fail the bootstrap layer and report the step

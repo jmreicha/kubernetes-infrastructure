@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=https://textla.dev/yass/v1.schema.json
+---
+description: >
+  The platform layer. What applications consume: provisioning, autoscaling,
+  restarts, image updates, load testing, schema migrations, environment promotion, and on bare metal, Kafka, databases, and virtual machines.
+version: v1
+---
+spec: Platform
+INPUT:
+- CONFORMS: ./core@Core::RETURN
+- MUST: rely on every core Application being Synced and Healthy without re-checking each one
+- WHEN: a core Application is not Healthy when this layer starts
+  MUST: not start, and report that the core layer has not completed
+RETURN:
+- MUST: "render one Application for every catalog entry whose layer is `platform` and whose providers include the cluster's provider, in AppProject `platform`"
+- MUST: render no Application for any other catalog entry
+- MUST: complete when every rendered Application is Synced and Healthy
+- MUST: install Crossplane with no providers, functions, or compositions, because those are configuration
+- MUST: install the k6 operator with no TestRun resources
+- MUST: install the Atlas operator with no AtlasSchema or AtlasMigration resources
+- MUST: install Kargo as a self-contained instance that promotes only between stages within this cluster, using this cluster's Argo CD, with no Projects, Warehouses, or Stages
+- MUST-NOT: configure Kargo to reach any other cluster or any Kargo control plane
+- MUST: read the Kargo admin password hash and token signing key from the Secret seeded by SecretSeed
+  SEE: ./bootstrap@SecretSeed
+ERROR:
+- WHEN: any platform-layer Application is not Synced and Healthy 30 minutes after the platform root Application is applied
+  MUST: fail, naming every Application that is Degraded, OutOfSync, Missing, or Progressing
+- MUST: fail, report the failure, and leave the cluster as it stands
+---
+spec: Platform.Baremetal
+INPUT:
+- CONFORMS: Platform::INPUT
+- MUST: rely on Longhorn being the default StorageClass
+  SEE: ./core@Core.Baremetal
+RETURN:
+- CONFORMS: Platform::RETURN
+- MUST: install the Strimzi operator watching all namespaces, with no Kafka resources
+- MUST: install OpenEverest with its PostgreSQL, MySQL, and MongoDB operators and no database clusters
+- MUST: install KubeVirt with its operator and a single KubeVirt resource, which is the one configuration object this layer installs because the operator deploys nothing without it
+- MUST: install CDI with its operator and a single CDI resource, after KubeVirt, using Longhorn for imported disks
+- MUST: "label the kubevirt and cdi namespaces `pod-security.kubernetes.io/enforce=privileged`"
+- MUST-NOT: create any VirtualMachine, DataVolume, or VM template
+- MUST-NOT: enable KubeVirt software emulation
+ERROR:
+- WHEN: a node lacks hardware virtualization (/dev/kvm)
+  MUST: fail through Platform ERROR, with kubevirt named as Degraded
+- CONFORMS: Platform::ERROR

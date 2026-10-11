@@ -1,0 +1,129 @@
+# yaml-language-server: $schema=https://textla.dev/yass/v1.schema.json
+---
+description: >
+  Cluster foundation. Given a fresh Kubernetes cluster, a provider (eks or baremetal), and
+  per-cluster values, this project brings the cluster to a known state through Argo CD.
+  It does so in three layers: bootstrap (Cilium and Argo CD, installed imperatively), core
+  (what the cluster needs to work and be secure and observable), and platform
+  (what applications consume). Each layer's Applications are rendered by a Helm app-of-apps
+  chart from a fixed catalog.
+version: v1
+related:
+- https://github.com/shakefu/yass
+- https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/
+---
+spec: ClusterFoundation
+INPUT:
+- MUST: "accept a provider, which is exactly one of `eks` or `baremetal`"
+- MUST: "accept a cluster values file at `clusters/<cluster-name>.yaml`"
+  CONFORMS: spec/values@ClusterValues
+- MUST: accept a fresh cluster with no CNI installed and nothing yet installed by this project
+- WHEN: the provider is eks
+  MUST: install the eks variant of each layer
+  SEE: spec/core@Core.Eks
+- WHEN: the provider is baremetal
+  MUST: install the baremetal variant of each layer
+  SEE: spec/core@Core.Baremetal
+RETURN:
+- MUST: run the bootstrap layer, then the core layer, then the platform layer, each only after the previous layer has completed
+  SEE: spec/bootstrap@Bootstrap
+- MUST: report success only when every Application of every installed layer is Synced and Healthy
+  SEE: spec/platform@Platform
+- WHEN: the provider is baremetal
+  MUST: install the baremetal variant of the platform layer
+  SEE: spec/platform@Platform.Baremetal
+- WHEN: coreOnly is true in the cluster values
+  MUST: stop after the core layer, reporting success on the core layer alone
+ERROR:
+- WHEN: the provider is missing, or is any value other than `eks` or `baremetal`
+  MUST: fail before any change is made to the cluster, and name the accepted values
+- WHEN: the cluster values file is missing or fails ClusterValues validation
+  MUST: fail before any change is made to the cluster, and name each invalid or missing key
+- WHEN: a layer does not complete
+  MUST: fail without starting any later layer, and report which layer failed
+- MUST: fail, report the failure, and leave the cluster exactly as it stands, with nothing rolled back and nothing deleted
+SIDE-EFFECT:
+- MUST-NOT: write a secret value to git, to a log, or to any file in this repository
+INVARIANT:
+- USES: GitOpsConventions
+- USES: Catalog
+---
+design: GitOpsConventions
+type: constraint
+content: |
+  Repository layout
+    clusters/<cluster-name>.yaml   per-cluster values (see spec/values ClusterValues)
+    apps/                          Helm chart (the app-of-apps) that renders Argo CD
+                                   Applications for one layer and one provider
+    apps/values.yaml               catalog entries: project, chart, repoURL, version,
+                                   namespace, layer, providers, wave
+    bootstrap/<layer>.yaml         root Application per layer; points at apps/ with
+                                   values clusters/<cluster-name>.yaml and layer=<layer>
+
+  Argo CD
+    One Argo CD per cluster, managing that cluster only (destination
+    https://kubernetes.default.svc). Argo CD manages its own release after bootstrap.
+    AppProject `core` is allowed cluster-scoped resources of any kind.
+    AppProject `platform` is allowed only CustomResourceDefinition,
+    ClusterRole, ClusterRoleBinding, MutatingWebhookConfiguration,
+    ValidatingWebhookConfiguration and Namespace as cluster-scoped kinds.
+    Every Application: syncPolicy.automated with prune=true and selfHeal=true;
+    syncOptions CreateNamespace=true and ServerSideApply=true;
+    finalizer resources-finalizer.argocd.argoproj.io;
+    label layer=<layer>.
+
+  Sync waves (argocd.argoproj.io/sync-wave)
+    -1  AppProjects
+     0  Cilium, Argo CD (adopted from bootstrap)
+     1  core operators that install CRDs or admission webhooks
+     2  every other core Application
+     3  platform-layer Applications that depend on a StorageClass or on CRDs from wave 1
+     4  every other platform-layer Application
+
+  Version pinning
+    Every Application pins an exact chart version (targetRevision) in apps/values.yaml.
+    No ranges, no wildcards, no `latest`, no `HEAD`, no branch names.
+    Renovate updates the pins through a customManagers regex entry over
+    apps/values.yaml; the spec never states a version.
+
+  Namespaces
+    Each project installs into the namespace given in the catalog. On baremetal, every
+    namespace whose workloads need host access is labelled
+    pod-security.kubernetes.io/enforce=privileged.
+---
+design: Catalog
+type: table
+content: |
+  project                   chart                       repoURL                                                     namespace             layer     providers        wave
+  cilium                    cilium                      https://helm.cilium.io                                      kube-system           bootstrap eks,baremetal    0
+  argo-cd                   argo-cd                     https://argoproj.github.io/argo-helm                        argocd                bootstrap eks,baremetal    0
+  cert-manager              cert-manager                https://charts.jetstack.io                                  cert-manager          core      eks,baremetal    1
+  gatekeeper                gatekeeper                  https://open-policy-agent.github.io/gatekeeper/charts       gatekeeper-system     core      eks,baremetal    1
+  external-secrets          external-secrets            https://charts.external-secrets.io                          external-secrets      core      eks,baremetal    1
+  onepassword-connect       connect                     https://1password.github.io/connect-helm-charts             onepassword           core      eks,baremetal    1
+  karpenter                 karpenter                   oci://public.ecr.aws/karpenter                              kube-system           core      eks              1
+  aws-ebs-csi-driver        aws-ebs-csi-driver          https://kubernetes-sigs.github.io/aws-ebs-csi-driver        kube-system           core      eks              1
+  longhorn                  longhorn                    https://charts.longhorn.io                                  longhorn-system       core      baremetal        1
+  envoy-gateway             gateway-helm                oci://docker.io/envoyproxy                                  envoy-gateway-system  core      eks,baremetal    1
+  external-dns              external-dns                https://kubernetes-sigs.github.io/external-dns              external-dns          core      eks,baremetal    2
+  aws-load-balancer-ctrl    aws-load-balancer-controller https://aws.github.io/eks-charts                           kube-system           core      eks              2
+  falco                     falco                       https://falcosecurity.github.io/charts                      falco                 core      eks,baremetal    2
+  metrics-server            metrics-server              https://kubernetes-sigs.github.io/metrics-server            kube-system           core      eks,baremetal    2
+  kube-state-metrics        kube-state-metrics          https://prometheus-community.github.io/helm-charts          kube-system           core      eks,baremetal    2
+  opentelemetry-operator    opentelemetry-operator      https://open-telemetry.github.io/opentelemetry-helm-charts  opentelemetry         core      eks,baremetal    2
+  kor                       kor                         https://yonahd.github.io/kor                                kor                   core      eks,baremetal    2
+  kubechecks                kubechecks                  https://zapier.github.io/kubechecks                         kubechecks            core      eks,baremetal    2
+  strimzi                   strimzi-kafka-operator      https://strimzi.io/charts                                   strimzi               platform  baremetal        3
+  openeverest               openeverest                 https://openeverest.github.io/helm-charts                   everest-system        platform  baremetal        3
+  kubevirt                  kubevirt                    https://encircle360-oss.github.io/helm-charts               kubevirt              platform  baremetal        3
+  cdi                       cdi                         https://encircle360-oss.github.io/helm-charts               cdi                   platform  baremetal        4
+  crossplane                crossplane                  https://charts.crossplane.io/stable                         crossplane-system     platform  eks,baremetal    4
+  keda                      keda                        https://kedacore.github.io/charts                           keda                  platform  eks,baremetal    4
+  reloader                  reloader                    https://stakater.github.io/stakater-charts                  reloader              platform  eks,baremetal    4
+  argocd-image-updater      argocd-image-updater        https://argoproj.github.io/argo-helm                        argocd                platform  eks,baremetal    4
+  k6-operator               k6-operator                 https://grafana.github.io/helm-charts                       k6-operator-system    platform  eks,baremetal    4
+  atlas-operator            atlas-operator              oci://ghcr.io/ariga/charts                                  atlas-operator        platform  eks,baremetal    4
+  kargo                     kargo                       oci://ghcr.io/akuity/kargo-charts                           kargo                 platform  eks,baremetal    4
+
+  The catalog is closed: no project outside this table is installed by this project.
+  external-dns is optional: it is installed only when the cluster values carry a domain.
