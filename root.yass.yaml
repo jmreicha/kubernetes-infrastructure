@@ -69,7 +69,12 @@ content: |
     AppProject `platform` is allowed only CustomResourceDefinition,
     ClusterRole, ClusterRoleBinding, MutatingWebhookConfiguration,
     ValidatingWebhookConfiguration and Namespace as cluster-scoped kinds.
+    Argo CD carries a resource.customizations.health.argoproj.io_Application Lua
+    check that reports a child Application's own health status, so a parent's sync
+    waves wait for each child to be Healthy (Argo CD does not do this by default).
     Every Application: syncPolicy.automated with prune=true and selfHeal=true;
+    syncPolicy.retry with limit 5, backoff duration 10s, factor 2, maxDuration 3m,
+    and refresh=true;
     syncOptions CreateNamespace=true and ServerSideApply=true;
     finalizer resources-finalizer.argocd.argoproj.io;
     label layer=<layer>.
@@ -87,6 +92,10 @@ content: |
     No ranges, no wildcards, no `latest`, no `HEAD`, no branch names.
     Renovate updates the pins through a customManagers regex entry over
     apps/values.yaml; the spec never states a version.
+
+  Gateway API CRDs
+    The envoy-gateway Application is the only owner of the Gateway API CRDs. Cilium's
+    Gateway API support stays disabled, and no other Application installs them.
 
   Namespaces
     Each project installs into the namespace given in the catalog. On baremetal, every
@@ -106,6 +115,7 @@ content: |
   karpenter                 karpenter                   oci://public.ecr.aws/karpenter                              kube-system           core      eks              1
   aws-ebs-csi-driver        aws-ebs-csi-driver          https://kubernetes-sigs.github.io/aws-ebs-csi-driver        kube-system           core      eks              1
   longhorn                  longhorn                    https://charts.longhorn.io                                  longhorn-system       core      baremetal        1
+  local-path-provisioner    deploy/chart/local-path-provisioner https://github.com/rancher/local-path-provisioner (git) local-path-storage  core      baremetal        1
   envoy-gateway             gateway-helm                oci://docker.io/envoyproxy                                  envoy-gateway-system  core      eks,baremetal    1
   external-dns              external-dns                https://kubernetes-sigs.github.io/external-dns              external-dns          core      eks,baremetal    2
   aws-load-balancer-ctrl    aws-load-balancer-controller https://aws.github.io/eks-charts                           kube-system           core      eks              2
@@ -130,3 +140,7 @@ content: |
   The catalog is closed: no project outside this table is installed by this project.
   external-dns is optional: it is installed only when the cluster values carry a domain.
   Every platform-layer entry is installed by default and may be disabled per cluster.
+  In core, only longhorn and local-path-provisioner may be disabled; local-path-provisioner
+  is installed only when longhorn is disabled.
+  local-path-provisioner is sourced from git at an exact release tag; every other entry is a
+  Helm chart.

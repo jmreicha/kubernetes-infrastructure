@@ -18,12 +18,13 @@ RETURN:
   CONFORMS: SecretSeed::RETURN
 - MUST: guarantee on completion that the AppProjects and the core root Application have been applied
 SIDE-EFFECT:
-- MUST: "install Cilium with `helm install`, at the catalog version, with kubeProxyReplacement enabled, Hubble enabled, and k8sServiceHost/k8sServicePort from apiServerHost/apiServerPort"
+- MUST: "install Cilium with `helm install`, at the catalog version, with kubeProxyReplacement enabled, Hubble enabled, Gateway API support disabled, and k8sServiceHost/k8sServicePort from apiServerHost/apiServerPort"
 - WHEN: provider is eks
   MUST: install Cilium in ENI IPAM mode and remove the AWS VPC CNI (the aws-node DaemonSet)
 - WHEN: provider is baremetal
   MUST: install Cilium with LB-IPAM enabled over lbIpPool, L2 announcements enabled, and the Talos cgroup and capability settings
-- MUST: "install Argo CD with `helm install` after every node reports Ready"
+- MUST: "install Argo CD with `helm install` after every node reports Ready, with the Application health customization from GitOpsConventions"
+  USES: ../root@GitOpsConventions
 - MUST: seed every Secret before any core Application is applied
   SEE: SecretSeed
 - MUST: apply the AppProjects and the core root Application last

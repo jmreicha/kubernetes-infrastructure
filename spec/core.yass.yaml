@@ -53,17 +53,29 @@ ERROR:
 spec: Core.Baremetal
 INPUT:
 - CONFORMS: Core::INPUT
-- MUST: "rely on every node carrying the Talos `iscsi-tools` and `util-linux-tools` system extensions and the Longhorn kubelet extraMounts"
+- WHEN: longhorn is not disabled
+  MUST: "rely on every node carrying the Talos `iscsi-tools` and `util-linux-tools` system extensions and the Longhorn kubelet extraMounts"
+- WHEN: longhorn is disabled and local-path-provisioner is not
+  MUST: "rely on every node's Talos machine config making `/var/local-path-provisioner` writable to the provisioner"
+- WHEN: longhorn and local-path-provisioner are both disabled
+  MUST: "rely on the StorageClass named by `defaultStorageClass` existing and being provided outside this project"
 RETURN:
 - CONFORMS: Core::RETURN
 SIDE-EFFECT:
 - CONFORMS: Core::SIDE-EFFECT
-- MUST: install Longhorn with its StorageClass marked default
+- WHEN: longhorn is not disabled
+  MUST: install Longhorn with its StorageClass marked default, and render no local-path-provisioner Application
+- WHEN: longhorn is disabled and local-path-provisioner is not
+  MUST: install local-path-provisioner with its StorageClass marked default
+- WHEN: longhorn and local-path-provisioner are both disabled
+  MUST: install no StorageClass, and mark no StorageClass default
 - WHEN: the cluster values carry a domain
   MUST: configure external-dns with the cloudflare provider and domainFilters set to domain, reading the API token from the Secret seeded by SecretSeed
   SEE: ./bootstrap@SecretSeed
-- MUST: "label the longhorn-system and falco namespaces `pod-security.kubernetes.io/enforce=privileged`"
+- MUST: "label the falco namespace, and the longhorn-system or local-path-storage namespace when installed, `pod-security.kubernetes.io/enforce=privileged`"
 ERROR:
 - WHEN: a node lacks the Talos extensions Longhorn needs
   MUST: fail through Core ERROR, with longhorn named as Degraded
+- WHEN: "the StorageClass named by `defaultStorageClass` does not exist, or is not the only StorageClass annotated as default, 30 minutes after the core root Application is applied"
+  MUST: fail through Core ERROR, naming the StorageClass
 - CONFORMS: Core::ERROR

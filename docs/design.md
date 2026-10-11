@@ -44,14 +44,17 @@ How the boundary is enforced:
 
 ## Optional components
 
-- **Core is mandatory.** Nothing in core can be disabled, so every cluster of a provider
-  has the same foundation.
+- **Core is mandatory, except storage.** On bare metal, Longhorn is the default. With
+  `disable: [longhorn]`, local-path-provisioner becomes the default StorageClass
+  instead (node-local, no replication). With both disabled, `defaultStorageClass`
+  names one you provide, and core checks it exists and is the only default. Either way,
+  core still guarantees exactly one default StorageClass to the platform layer.
 - **One exception, external-dns.** It's installed only when `clusters/<name>.yaml` sets
   `domain`, since not every cluster owns a DNS zone. Route53 on EKS, Cloudflare on bare
   metal, with its token seeded from 1Password.
-- **Platform is on by default.** Opt out per cluster with `disable: [name, ...]`. Only
-  platform-layer catalog names are accepted; core, bootstrap, or unknown names are
-  rejected. A platform name the provider doesn't offer, such as `kubevirt` on EKS, is
+- **Platform is on by default.** Opt out per cluster with `disable: [name, ...]`. It
+  accepts platform-layer names plus `longhorn` and `local-path-provisioner`; any other
+  core, bootstrap, or unknown name is rejected. A platform name the provider doesn't offer, such as `kubevirt` on EKS, is
   accepted and does nothing.
 - **Disabling has knock-on effects.** Disabling `kargo` drops its seeded Secret and its
   `secretRefs`. CDI goes with KubeVirt: disabling `kubevirt` also removes `cdi`,
@@ -60,8 +63,9 @@ How the boundary is enforced:
   (Karpenter on EKS, Longhorn on bare metal) are set by the Catalog's providers column,
   not by `disable`.
 
-Changes are verified by render tests (helm template, kubeconform, conftest Rego) and API
-tests (server-side dry-run against kwok); see `spec/verification`.
+Changes are verified by render tests (helm template, kubeconform, conftest Rego), API
+tests (server-side dry-run against kwok), and a risk check that compares the rendered base
+and head trees; see `spec/verification`.
 
 ## Decisions
 
@@ -83,14 +87,21 @@ tests (server-side dry-run against kwok); see `spec/verification`.
 | 14 | Falco for runtime security | Useful default ruleset on day one | Tetragon (needs authored policies); revisit for enforcement |
 | 15 | Gatekeeper for admission policy, no constraints in v1 | Requested; constraints are config | |
 | 16 | Talos for bare metal | Immutable; handles reboots and upgrades itself, so no kured | k3s, RKE2, kubeadm |
-| 17 | Longhorn in core on bare metal | Only StorageClass there; peer of EBS CSI | Platform layer |
+| 17 | Longhorn in core on bare metal, optional | Default StorageClass there; peer of EBS CSI | Platform layer |
+| 30 | Without Longhorn: local-path-provisioner, or bring your own StorageClass | Lighter clusters keep a default StorageClass; platform's input is unchanged | Dropping the storage guarantee |
+| 31 | local-path-provisioner from upstream git at a release tag | No official Helm repo; community repackagings lag | containeroo and other community charts |
 | 18 | KubeVirt via community chart (encircle360-oss) | Only publisher with both kubevirt and cdi charts | Kustomize remote URLs; vendored manifests |
 | 19 | Atlas for schema migrations | Versioned and declarative, lints destructive changes | SchemaHero |
 | 20 | Kargo per cluster, promoting within that cluster only | Fits Argo-per-cluster without a management cluster | Central Kargo control plane |
 | 21 | Platform components default on, per-cluster `disable` list | Clusters stay uniform unless stated | Opt-in list |
 | 22 | external-dns optional (needs `domain`); Route53 on EKS, Cloudflare on bare metal | Not every cluster owns a zone | |
 | 23 | Strimzi and OpenEverest on both providers | Spec states what's installed, not what apps must use; MSK/RDS stay an app choice | Bare metal only |
-| 24 | Render-tier CRD schemas from CustomResourceDefinition/catalog at a pinned tag; the API tier is authoritative | Fast schema checks without a cluster; the catalog tracks latest CRDs, not our pins | Generating schemas from the charts' CRDs |
+| 24 | Render-tier schemas generated from the rendered CRDs, then the CustomResourceDefinition/catalog at a pinned tag as fallback; the API tier is authoritative | Exact match to our pins; the catalog covers CRDs that operators create at runtime | Catalog only (tracks latest CRDs, not our pins) |
+| 25 | Argo CD Lua health check for child Applications | Without it, app-of-apps sync waves don't wait for child health | |
+| 26 | CI renders with the Helm and Kustomize versions bundled in the pinned Argo CD | A render that passes only with other versions proves nothing | Latest tools |
+| 27 | PR risk check compares rendered base and head trees | Catches data-loss and breaking transitions, especially in Renovate bumps | Review by eye |
+| 28 | Sync retry with backoff and refresh | Transient webhook or CRD readiness shouldn't fail a wave | No retry |
+| 29 | Envoy Gateway is the sole owner of Gateway API CRDs; Cilium Gateway API disabled | Two owners fight over CRD versions | Cilium Gateway API |
 
 ## Known gaps
 
