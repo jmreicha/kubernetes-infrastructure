@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Fail on Kubernetes APIs deprecated or removed in the target version (pluto).
+# Usage: scripts/check-apis [--report-only] <manifest-dir> <kubernetes-minor, e.g. 1.34>
+# --report-only prints findings without failing, for looking ahead to the next version.
+set -euo pipefail
+report_only=false
+[ "${1:-}" = --report-only ] && report_only=true && shift
+pluto detect-files -d "$1" --target-versions "k8s=v$2.0" -o wide || $report_only

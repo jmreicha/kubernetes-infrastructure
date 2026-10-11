@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# API tier (spec/verification Verification.Api): server-side dry-run of every rendered
+# manifest against a kwok kube-apiserver, one per Kubernetes version. Needs the render tier's output.
+# Usage: scripts/verify-api [render-dir]
+set -euo pipefail
+root=$(cd "$(dirname "$0")/.." && pwd)
+renders=${1:-$root/.cache/render}
+jobs=${API_JOBS:-8}
+fail=0
+
+validate() { # kubeconfig file namespace label
+  local kc=$1 file=$2 ns=$3 label=$4 out real
+  # Objects without a namespace land in the Application's destination, as Argo CD does.
+  yq "select(.kind != \"CustomResourceDefinition\" and .kind != null) | .metadata.namespace = (.metadata.namespace // \"$ns\")" "$file" >"$file.rest"
+  [ -s "$file.rest" ] || return 0
+  out=$(kubectl --kubeconfig "$kc" apply --server-side --dry-run=server -f "$file.rest" 2>&1) && return 0
+  # Kinds whose CRDs an operator creates at runtime can't be validated here (render tier covers them).
+  real=$(grep -vE 'no matches for kind|ensure CRDs are installed first|^Warning:' <<<"$out" | grep -iE 'error|invalid|denied' || true)
+  [ -z "$real" ] && return 0
+  echo "$label:"$'\n'"$real" >&2
+  return 1
+}
+
+dirs=()
+for dir in "$renders"/*/; do [ -f "$dir/bundle.json" ] && dirs+=("${dir%/}"); done
+minors=$(for d in "${dirs[@]}"; do jq -r .kubernetesVersion "$d/cluster.json"; done | sort -u)
+
+for minor in $minors; do
+  name="verify-${minor//./-}" kc="$renders/kubeconfig-$minor"
+  mine=()
+  for d in "${dirs[@]}"; do [ "$(jq -r .kubernetesVersion "$d/cluster.json")" = "$minor" ] && mine+=("$d"); done
+  echo "== kube-apiserver v$minor.0: $(for d in "${mine[@]}"; do basename "$d"; done | xargs)" >&2
+  trap 'kwokctl delete cluster --name "$name" --kubeconfig "$kc" >/dev/null 2>&1 || true' EXIT
+  KWOK_KUBE_VERSION="v$minor.0" kwokctl create cluster --name "$name" --runtime docker \
+    --kubeconfig "$kc" --wait 3m >"$renders/kwok-$minor.log" 2>&1 || {
+    echo "kwok cluster failed to start; see $renders/kwok-$minor.log" >&2
+    fail=1
+    continue
+  }
+
+  # CRDs and namespaces are created for real, once, so every dependent can be validated.
+  # Argo CD creates destination namespaces and syncs rendered Namespace objects first.
+  for d in "${mine[@]}"; do cat "$d"/charts/*.yaml "$d"/apps/*.yaml; done \
+    | yq 'select(.kind == "CustomResourceDefinition")' >"$renders/crds-$minor.yaml"
+  if [ -s "$renders/crds-$minor.yaml" ]; then
+    kubectl --kubeconfig "$kc" apply --server-side --force-conflicts -f "$renders/crds-$minor.yaml" >/dev/null
+    kubectl --kubeconfig "$kc" wait --for condition=established --all crd --timeout 2m >/dev/null
+  fi
+  for ns in argocd $(for d in "${mine[@]}"; do
+    jq -r '.[].spec.destination.namespace' "$d/apps.json"
+    cat "$d"/charts/*.yaml | yq -N 'select(.kind == "Namespace") | .metadata.name'
+  done | sort -u); do
+    kubectl --kubeconfig "$kc" create namespace "$ns" --dry-run=client -o yaml \
+      | kubectl --kubeconfig "$kc" apply -f - >/dev/null 2>&1
+  done
+
+  # Dry runs persist nothing, so every file is validated in parallel.
+  for d in "${mine[@]}"; do
+    f=$(basename "$d")
+    for l in cluster core platform; do echo "$d/apps/$l.yaml argocd $f/apps/$l"; done
+    jq -r --arg d "$d" --arg f "$f" '.[] | select(.spec.source.repoURL | test("kubernetes-infrastructure") | not)
+      | "\($d)/charts/\(.metadata.name).yaml \(.spec.destination.namespace) \($f)/\(.metadata.name)"' "$d/apps.json"
+  done >"$renders/api-files-$minor"
+  while read -r file ns label; do
+    validate "$kc" "$file" "$ns" "$label" || touch "$renders/api-failed" &
+    while [ "$(jobs -rp | wc -l)" -ge "$jobs" ]; do wait -n || true; done
+  done <"$renders/api-files-$minor"
+  wait
+
+  kwokctl delete cluster --name "$name" --kubeconfig "$kc" >/dev/null 2>&1 || true
+  trap - EXIT
+done
+[ ! -e "$renders/api-failed" ] || {
+  rm -f "$renders/api-failed"
+  fail=1
+}
+exit $fail

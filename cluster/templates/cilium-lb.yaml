@@ -1,0 +1,26 @@
+{{- /* Bare-metal LoadBalancer addresses: Cilium LB-IPAM over lbIpPool, announced via L2. */ -}}
+{{- if and (eq .Values.layer "cluster") (eq .Values.provider "baremetal") }}
+---
+apiVersion: cilium.io/v2
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: default
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  blocks:
+    {{- range .Values.lbIpPool }}
+    - cidr: {{ . }}
+    {{- end }}
+---
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: default
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  loadBalancerIPs: true
+{{- end }}

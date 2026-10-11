@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "cluster chart values",
+  "description": "Validates the catalog's shape. Cluster values (clusters/<name>.yaml) are validated by policies/values.rego.",
+  "type": "object",
+  "properties": {
+    "catalog": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/entry" }
+    }
+  },
+  "definitions": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "repoURL", "version", "namespace", "layer", "providers", "wave"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" },
+        "chart": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "repoURL": { "type": "string", "pattern": "^(https|oci)://" },
+        "version": { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" },
+        "layer": { "enum": ["bootstrap", "core", "platform"] },
+        "providers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["eks", "baremetal"] }
+        },
+        "wave": { "type": "integer", "minimum": 0 },
+        "optional": { "type": "boolean" },
+        "optIn": { "type": "boolean" },
+        "when": { "type": "string" },
+        "values": { "type": "string" },
+        "ignoreDifferences": { "type": "array", "items": { "type": "object" } }
+      },
+      "oneOf": [
+        { "required": ["chart"], "not": { "required": ["path"] } },
+        { "required": ["path"], "not": { "required": ["chart"] } }
+      ],
+      "not": { "required": ["optional", "optIn"] }
+    }
+  }
+}

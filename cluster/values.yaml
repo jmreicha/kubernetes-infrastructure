@@ -1,0 +1,587 @@
+# Catalog for the app-of-apps (root.yass.yaml Catalog, GitOpsConventions).
+# Cluster values (clusters/<name>.yaml) are layered on top; `values` and `when` are tpl'd.
+
+layer: ""
+gitRepo: https://github.com/jmreicha/kubernetes-infrastructure.git
+gitRevision: main
+# Path from the repo root to this cluster's values file; set by bootstrap.sh.
+clusterValuesFile: ""
+
+# Cluster values defaults (see spec/values).
+provider: ""
+clusterName: ""
+domain: ""
+coreOnly: false
+# Catalog entries marked `optional` are installed unless named here.
+disable: []
+# Catalog entries marked `optIn` are installed only when named here.
+enable: []
+pullThroughCacheIp: ""
+
+# Upstream registries the pull-through cache (zot) mirrors, by host.
+pullThroughCacheRegistries:
+  docker.io: https://registry-1.docker.io
+  ghcr.io: https://ghcr.io
+  quay.io: https://quay.io
+  registry.k8s.io: https://registry.k8s.io
+  public.ecr.aws: https://public.ecr.aws
+  gcr.io: https://gcr.io
+
+# Namespaces whose workloads need host access (spec/security); all others enforce baseline.
+privilegedNamespaces: [kube-system, falco, longhorn-system, local-path-storage, kubevirt, cdi]
+
+# Cluster-scoped kinds the platform AppProject may create.
+platformClusterKinds:
+  - { group: apiextensions.k8s.io, kind: CustomResourceDefinition }
+  - { group: rbac.authorization.k8s.io, kind: ClusterRole }
+  - { group: rbac.authorization.k8s.io, kind: ClusterRoleBinding }
+  - { group: admissionregistration.k8s.io, kind: MutatingWebhookConfiguration }
+  - { group: admissionregistration.k8s.io, kind: ValidatingWebhookConfiguration }
+  - { group: "", kind: Namespace }
+  - { group: apiregistration.k8s.io, kind: APIService }
+  - { group: scheduling.k8s.io, kind: PriorityClass }
+  - { group: cdi.kubevirt.io, kind: CDI }
+  - { group: operators.coreos.com, kind: OLMConfig }
+  - { group: everest.percona.com, kind: DataImporter }
+  - { group: everest.percona.com, kind: LoadBalancerConfig }
+  - { group: everest.percona.com, kind: PodSchedulingPolicy }
+
+catalog:
+  # --- bootstrap (installed by bootstrap.sh, then adopted) ---
+  - name: cilium
+    chart: cilium
+    repoURL: https://helm.cilium.io
+    version: 1.20.2
+    namespace: kube-system
+    layer: bootstrap
+    providers: [eks, baremetal]
+    wave: 0
+    values: |
+      kubeProxyReplacement: true
+      encryption:
+        enabled: true
+        type: wireguard
+      # Report, don't drop, until spec/security says otherwise.
+      policyAuditMode: true
+      k8sServiceHost: {{ .Values.apiServerHost }}
+      k8sServicePort: {{ .Values.apiServerPort }}
+      gatewayAPI:
+        enabled: false
+      hubble:
+        tls:
+          auto:
+            method: cronJob
+        relay:
+          enabled: true
+        ui:
+          enabled: true
+      {{- if eq .Values.provider "eks" }}
+      eni:
+        enabled: true
+      ipam:
+        mode: eni
+      routingMode: native
+      egressMasqueradeInterfaces: eth+
+      {{- else }}
+      ipam:
+        mode: kubernetes
+      l2announcements:
+        enabled: true
+      externalIPs:
+        enabled: true
+      cgroup:
+        autoMount:
+          enabled: false
+        hostRoot: /sys/fs/cgroup
+      securityContext:
+        capabilities:
+          ciliumAgent: [CHOWN, KILL, NET_ADMIN, NET_RAW, IPC_LOCK, SYS_ADMIN, SYS_RESOURCE, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+          cleanCiliumState: [NET_ADMIN, SYS_ADMIN, SYS_RESOURCE]
+      {{- end }}
+
+  - name: argo-cd
+    chart: argo-cd
+    repoURL: https://argoproj.github.io/argo-helm
+    version: 10.10.2
+    namespace: argocd
+    layer: bootstrap
+    providers: [eks, baremetal]
+    wave: 0
+    values: |
+      configs:
+        cm:
+          accounts.kubechecks: apiKey
+          # Report child Application health so app-of-apps sync waves wait on it.
+          resource.customizations.health.argoproj.io_Application: |
+            hs = {}
+            hs.status = "Progressing"
+            hs.message = ""
+            if obj.status ~= nil and obj.status.health ~= nil then
+              hs.status = obj.status.health.status
+              if obj.status.health.message ~= nil then
+                hs.message = obj.status.health.message
+              end
+            end
+            return hs
+        rbac:
+          policy.csv: |
+            g, kubechecks, role:readonly
+
+  # --- core ---
+  - name: cert-manager
+    chart: cert-manager
+    repoURL: https://charts.jetstack.io
+    version: v1.21.2
+    namespace: cert-manager
+    layer: core
+    providers: [eks, baremetal]
+    wave: 1
+    values: |
+      crds:
+        enabled: true
+
+  - name: gatekeeper
+    chart: gatekeeper
+    repoURL: https://open-policy-agent.github.io/gatekeeper/charts
+    version: 3.23.1
+    namespace: gatekeeper-system
+    layer: core
+    providers: [eks, baremetal]
+    wave: 1
+
+  # gatekeeper-library publishes no releases, so its templates pin a commit.
+  - name: gatekeeper-templates-psp
+    path: library/pod-security-policy
+    repoURL: https://github.com/open-policy-agent/gatekeeper-library.git
+    version: f8e3b4e9ab3b7d1a28092da75c2c5e71aedfd4b9
+    namespace: gatekeeper-system
+    layer: core
+    providers: [eks, baremetal]
+    wave: 2
+
+  - name: gatekeeper-templates-general
+    path: library/general
+    repoURL: https://github.com/open-policy-agent/gatekeeper-library.git
+    version: f8e3b4e9ab3b7d1a28092da75c2c5e71aedfd4b9
+    namespace: gatekeeper-system
+    layer: core
+    providers: [eks, baremetal]
+    wave: 2
+
+  - name: external-secrets
+    chart: external-secrets
+    repoURL: https://charts.external-secrets.io
+    version: 2.12.0
+    namespace: external-secrets
+    layer: core
+    providers: [eks, baremetal]
+    wave: 1
+
+  - name: onepassword-connect
+    chart: connect
+    repoURL: https://1password.github.io/connect-helm-charts
+    version: 2.4.2
+    namespace: onepassword
+    layer: core
+    providers: [eks, baremetal]
+    wave: 1
+    values: |
+      connect:
+        credentialsName: op-credentials
+        credentialsKey: 1password-credentials.json
+      operator:
+        create: true
+        token:
+          name: onepassword-token
+          key: token
+
+  - name: karpenter
+    chart: karpenter
+    repoURL: oci://public.ecr.aws/karpenter
+    version: 1.15.0
+    namespace: kube-system
+    layer: core
+    providers: [eks]
+    wave: 1
+    values: |
+      settings:
+        clusterName: {{ .Values.clusterName }}
+
+  - name: aws-ebs-csi-driver
+    chart: aws-ebs-csi-driver
+    repoURL: https://kubernetes-sigs.github.io/aws-ebs-csi-driver
+    version: 2.66.1
+    namespace: kube-system
+    layer: core
+    providers: [eks]
+    wave: 1
+    values: |
+      storageClasses:
+        - name: gp3
+          annotations:
+            storageclass.kubernetes.io/is-default-class: "true"
+          volumeBindingMode: WaitForFirstConsumer
+          allowVolumeExpansion: true
+          parameters:
+            type: gp3
+
+  - name: longhorn
+    chart: longhorn
+    repoURL: https://charts.longhorn.io
+    version: 1.13.0
+    namespace: longhorn-system
+    layer: core
+    optional: true
+    providers: [baremetal]
+    wave: 1
+    values: |
+      persistence:
+        defaultClass: true
+      preUpgradeChecker:
+        jobEnabled: false
+
+  - name: local-path-provisioner
+    path: deploy/chart/local-path-provisioner
+    repoURL: https://github.com/rancher/local-path-provisioner.git
+    version: v0.0.37
+    namespace: local-path-storage
+    layer: core
+    optional: true
+    providers: [baremetal]
+    wave: 1
+    when: '{{ has "longhorn" .Values.disable }}'
+    values: |
+      storageClass:
+        defaultClass: true
+      nodePathMap:
+        - node: DEFAULT_PATH_FOR_NON_LISTED_NODES
+          paths: [/var/local-path-provisioner]
+
+  - name: zot
+    chart: zot
+    repoURL: https://zotregistry.dev/helm-charts
+    version: 0.1.128
+    namespace: zot
+    layer: core
+    optIn: true
+    providers: [baremetal]
+    wave: 2
+    values: |
+      service:
+        type: LoadBalancer
+        annotations:
+          lbipam.cilium.io/ips: {{ .Values.pullThroughCacheIp | quote }}
+      persistence: true
+      pvc:
+        storage: 100Gi
+      mountConfig: true
+      configFiles:
+        config.json: |-
+          {
+            "storage": { "rootDirectory": "/var/lib/registry", "gc": true, "dedupe": true },
+            "http": { "address": "0.0.0.0", "port": "5000" },
+            "log": { "level": "info" },
+            "extensions": {
+              "sync": {
+                "enable": true,
+                "registries": [
+                  {{- $last := sub (len .Values.pullThroughCacheRegistries) 1 }}
+                  {{- range $i, $host := keys .Values.pullThroughCacheRegistries | sortAlpha }}
+                  {"urls": ["{{ index $.Values.pullThroughCacheRegistries $host }}"], "onDemand": true, "tlsVerify": true, "content": [{"prefix": "**", "destination": "/{{ $host }}"}]}{{ if lt $i $last }},{{ end }}
+                  {{- end }}
+                ]
+              }
+            }
+          }
+
+  - name: envoy-gateway
+    chart: gateway-helm
+    repoURL: oci://registry-1.docker.io/envoyproxy
+    version: 1.9.2
+    namespace: envoy-gateway-system
+    layer: core
+    providers: [eks, baremetal]
+    wave: 1
+
+  - name: external-dns
+    chart: external-dns
+    repoURL: https://kubernetes-sigs.github.io/external-dns
+    version: 1.23.0
+    namespace: external-dns
+    layer: core
+    providers: [eks, baremetal]
+    wave: 2
+    when: '{{ ne .Values.domain "" }}'
+    values: |
+      domainFilters: [{{ .Values.domain }}]
+      txtOwnerId: {{ .Values.clusterName }}
+      policy: sync
+      {{- if eq .Values.provider "eks" }}
+      provider:
+        name: aws
+      {{- else }}
+      provider:
+        name: cloudflare
+      env:
+        - name: CF_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: cloudflare-api-token
+              key: token
+      {{- end }}
+
+  - name: aws-load-balancer-controller
+    chart: aws-load-balancer-controller
+    repoURL: https://aws.github.io/eks-charts
+    version: 3.6.0
+    namespace: kube-system
+    layer: core
+    providers: [eks]
+    wave: 2
+    values: |
+      clusterName: {{ .Values.clusterName }}
+      enableCertManager: true
+      region: {{ .Values.region }}
+      vpcId: {{ .Values.vpcId }}
+
+  - name: falco
+    chart: falco
+    repoURL: https://falcosecurity.github.io/charts
+    version: 9.2.0
+    namespace: falco
+    layer: core
+    providers: [eks, baremetal]
+    wave: 2
+    values: |
+      driver:
+        kind: modern_ebpf
+
+  - name: metrics-server
+    chart: metrics-server
+    repoURL: https://kubernetes-sigs.github.io/metrics-server
+    version: 3.14.0
+    namespace: kube-system
+    layer: core
+    providers: [eks, baremetal]
+    wave: 2
+    values: |
+      {{- if eq .Values.provider "baremetal" }}
+      # Talos kubelets serve self-signed certs by default.
+      args: [--kubelet-insecure-tls]
+      {{- end }}
+
+  - name: kube-state-metrics
+    chart: kube-state-metrics
+    repoURL: https://prometheus-community.github.io/helm-charts
+    version: 8.6.0
+    namespace: kube-system
+    layer: core
+    providers: [eks, baremetal]
+    wave: 2
+
+  - name: opentelemetry-operator
+    chart: opentelemetry-operator
+    repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+    version: 0.124.1
+    namespace: opentelemetry
+    layer: core
+    providers: [eks, baremetal]
+    wave: 2
+
+  - name: kor
+    chart: kor
+    repoURL: https://yonahd.github.io/kor
+    version: 0.2.16
+    namespace: kor
+    layer: core
+    providers: [eks, baremetal]
+    wave: 2
+    # The chart defaults to :latest; pin the image (spec/security).
+    values: |
+      prometheusExporter:
+        deployment:
+          image:
+            # renovate: datasource=docker depName=yonahdissen/kor
+            tag: v0.6.9
+      cronJob:
+        image:
+          # renovate: datasource=docker depName=yonahdissen/kor
+          tag: v0.6.9
+
+  # --- platform ---
+  - name: strimzi
+    chart: strimzi-kafka-operator
+    repoURL: https://strimzi.io/charts
+    version: 1.2.0
+    namespace: strimzi
+    layer: platform
+    optional: true
+    providers: [eks, baremetal]
+    wave: 3
+    values: |
+      watchAnyNamespace: true
+
+  - name: openeverest
+    chart: openeverest
+    repoURL: https://openeverest.github.io/helm-charts
+    version: 1.16.2
+    namespace: everest-system
+    layer: platform
+    optional: true
+    providers: [eks, baremetal]
+    wave: 3
+    # Generated once at install; regenerating them would rotate the JWT and certs.
+    ignoreDifferences:
+      - { kind: Secret, name: everest-accounts, jsonPointers: [/data] }
+      - { kind: Secret, name: everest-jwt, jsonPointers: [/data] }
+      - { kind: Secret, name: packageserver-service-cert, jsonPointers: [/data] }
+      - { kind: Secret, name: webhook-server-cert, jsonPointers: [/data] }
+      - {
+          group: apiregistration.k8s.io,
+          kind: APIService,
+          name: v1.packages.operators.coreos.com,
+          jsonPointers: [/spec/caBundle],
+        }
+      - {
+          group: admissionregistration.k8s.io,
+          kind: MutatingWebhookConfiguration,
+          name: everest-operator-mutating-webhook-configuration,
+          jqPathExpressions: [".webhooks[]?.clientConfig.caBundle"],
+        }
+      - {
+          group: admissionregistration.k8s.io,
+          kind: ValidatingWebhookConfiguration,
+          name: everest-operator-validating-webhook-configuration,
+          jqPathExpressions: [".webhooks[]?.clientConfig.caBundle"],
+        }
+    values: |
+      telemetry: false
+      kube-state-metrics:
+        enabled: false
+
+  - name: kubevirt
+    chart: kubevirt
+    repoURL: oci://ghcr.io/naval-group/kubevirt-stack-charts
+    version: 0.2.0
+    namespace: kubevirt
+    layer: platform
+    optional: true
+    providers: [baremetal]
+    wave: 3
+    values: |
+      cr:
+        configuration:
+          developerConfiguration:
+            useEmulation: false
+
+  - name: cdi
+    chart: cdi
+    repoURL: oci://ghcr.io/naval-group/kubevirt-stack-charts
+    version: 0.3.0
+    namespace: cdi
+    layer: platform
+    optional: true
+    providers: [baremetal]
+    wave: 4
+    when: '{{ not (has "kubevirt" .Values.disable) }}'
+
+  - name: crossplane
+    chart: crossplane
+    repoURL: https://charts.crossplane.io/stable
+    version: 2.4.2
+    namespace: crossplane-system
+    layer: platform
+    optional: true
+    providers: [eks, baremetal]
+    wave: 4
+
+  - name: keda
+    chart: keda
+    repoURL: https://kedacore.github.io/charts
+    version: 2.21.0
+    namespace: keda
+    layer: platform
+    optional: true
+    providers: [eks, baremetal]
+    wave: 4
+
+  - name: reloader
+    chart: reloader
+    repoURL: https://stakater.github.io/stakater-charts
+    version: 2.2.18
+    namespace: reloader
+    layer: platform
+    optional: true
+    providers: [eks, baremetal]
+    wave: 4
+
+  - name: argocd-image-updater
+    chart: argocd-image-updater
+    repoURL: https://argoproj.github.io/argo-helm
+    version: 1.3.1
+    namespace: argocd
+    layer: platform
+    optional: true
+    providers: [eks, baremetal]
+    wave: 4
+
+  - name: k6-operator
+    chart: k6-operator
+    repoURL: https://grafana.github.io/helm-charts
+    version: 4.6.0
+    namespace: k6-operator-system
+    layer: platform
+    optional: true
+    providers: [eks, baremetal]
+    wave: 4
+
+  - name: atlas-operator
+    chart: atlas-operator
+    repoURL: oci://ghcr.io/ariga/charts
+    version: 0.8.1
+    namespace: atlas-operator
+    layer: platform
+    optional: true
+    providers: [eks, baremetal]
+    wave: 4
+
+  - name: kargo
+    chart: kargo
+    repoURL: oci://ghcr.io/akuity/kargo-charts
+    version: 1.12.3
+    namespace: kargo
+    layer: platform
+    optional: true
+    providers: [eks, baremetal]
+    wave: 4
+    values: |
+      api:
+        secret:
+          name: kargo-admin
+
+  - name: kubechecks
+    chart: kubechecks
+    repoURL: https://zapier.github.io/kubechecks
+    version: 3.1.0
+    namespace: kubechecks
+    layer: platform
+    optional: true
+    providers: [eks, baremetal]
+    wave: 4
+    when: '{{ ne .Values.domain "" }}'
+    values: |
+      configMap:
+        create: true
+        env:
+          KUBECHECKS_VCS_TYPE: github
+          KUBECHECKS_ARGOCD_API_SERVER_ADDR: argocd-server.argocd
+          KUBECHECKS_ARGOCD_API_INSECURE: "true"
+          KUBECHECKS_WEBHOOK_URL_BASE: https://kubechecks.{{ .Values.domain }}
+      # The chart defaults to :latest; pin the image (spec/security).
+      deployment:
+        image:
+          # renovate: datasource=docker depName=ghcr.io/zapier/kubechecks
+          tag: v3.5.0
+        envFrom:
+          - secretRef:
+              name: kubechecks-tokens

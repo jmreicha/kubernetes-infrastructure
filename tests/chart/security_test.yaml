@@ -1,0 +1,211 @@
+# spec/security: namespace labels, AppProject scope, network policy, encryption, constraints.
+suite: security
+tests:
+  - it: a baseline namespace enforces baseline and warns and audits restricted
+    values: [../clusters/eks.yaml]
+    set: { layer: core }
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: cert-manager }
+    asserts:
+      - equal:
+          path: spec.syncPolicy.managedNamespaceMetadata.labels
+          value:
+            pod-security.kubernetes.io/enforce: baseline
+            pod-security.kubernetes.io/warn: restricted
+            pod-security.kubernetes.io/audit: restricted
+  - it: falco is privileged on eks too
+    values: [../clusters/eks.yaml]
+    set: { layer: core }
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: falco }
+    asserts:
+      - equal:
+          {
+            path: 'spec.syncPolicy.managedNamespaceMetadata.labels["pod-security.kubernetes.io/enforce"]',
+            value: privileged,
+          }
+  - it: apps sharing kube-system agree on privileged
+    values: [../clusters/eks.yaml]
+    set: { layer: core }
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: karpenter }
+    asserts:
+      - equal:
+          {
+            path: 'spec.syncPolicy.managedNamespaceMetadata.labels["pod-security.kubernetes.io/enforce"]',
+            value: privileged,
+          }
+  - it: kubevirt is privileged and strimzi is baseline
+    values: [../clusters/baremetal.yaml]
+    set: { layer: platform }
+    template: templates/applications.yaml
+    asserts:
+      - equal:
+          path: 'spec.syncPolicy.managedNamespaceMetadata.labels["pod-security.kubernetes.io/enforce"]'
+          value: privileged
+        documentSelector: { path: metadata.name, value: kubevirt }
+      - equal:
+          path: 'spec.syncPolicy.managedNamespaceMetadata.labels["pod-security.kubernetes.io/enforce"]'
+          value: baseline
+        documentSelector: { path: metadata.name, value: strimzi }
+
+  - it: the core AppProject only sources this repo and core chart repos
+    values: [../clusters/eks.yaml]
+    set: { layer: bootstrap, clusterValuesFile: clusters/eks.yaml }
+    template: templates/projects.yaml
+    documentSelector: { path: metadata.name, value: core }
+    asserts:
+      - contains:
+          {
+            path: spec.sourceRepos,
+            content: https://github.com/jmreicha/kubernetes-infrastructure.git,
+          }
+      - contains: { path: spec.sourceRepos, content: https://charts.jetstack.io }
+      - contains: { path: spec.sourceRepos, content: public.ecr.aws/karpenter }
+      - notContains: { path: spec.sourceRepos, content: "*" }
+      - notContains: { path: spec.sourceRepos, content: https://strimzi.io/charts }
+      - contains:
+          {
+            path: spec.destinations,
+            content: { server: https://kubernetes.default.svc, namespace: cert-manager },
+          }
+      - notContains:
+          {
+            path: spec.destinations,
+            content: { server: https://kubernetes.default.svc, namespace: "*" },
+          }
+  - it: the platform AppProject only sources platform chart repos
+    values: [../clusters/baremetal.yaml]
+    set: { layer: bootstrap, clusterValuesFile: clusters/baremetal.yaml }
+    template: templates/projects.yaml
+    documentSelector: { path: metadata.name, value: platform }
+    asserts:
+      - contains: { path: spec.sourceRepos, content: https://strimzi.io/charts }
+      - notContains: { path: spec.sourceRepos, content: https://charts.jetstack.io }
+      - contains:
+          {
+            path: spec.destinations,
+            content: { server: https://kubernetes.default.svc, namespace: strimzi },
+          }
+      - contains:
+          {
+            path: spec.destinations,
+            content: { server: https://kubernetes.default.svc, namespace: argocd },
+          }
+      - notContains:
+          {
+            path: spec.destinations,
+            content: { server: https://kubernetes.default.svc, namespace: cert-manager },
+          }
+
+  - it: cilium encrypts with WireGuard and runs policy audit mode
+    values: [../clusters/eks.yaml]
+    set: { layer: cluster, clusterValuesFile: clusters/eks.yaml }
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: cilium }
+    asserts:
+      - equal:
+          {
+            path: spec.source.helm.valuesObject.encryption,
+            value: { enabled: true, type: wireguard },
+          }
+      - equal: { path: spec.source.helm.valuesObject.policyAuditMode, value: true }
+
+  - it: core namespaces get default-deny ingress, never kube-system
+    values: [../clusters/eks.yaml]
+    set: { layer: core }
+    template: templates/network-policies.yaml
+    asserts:
+      - containsDocument:
+          {
+            kind: CiliumNetworkPolicy,
+            apiVersion: cilium.io/v2,
+            name: default-deny-ingress,
+            namespace: cert-manager,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: CiliumNetworkPolicy,
+            apiVersion: cilium.io/v2,
+            name: default-deny-ingress,
+            namespace: falco,
+            any: true,
+          }
+      - hasDocuments: { count: 9 }
+      - notEqual: { path: metadata.namespace, value: kube-system }
+  - it: default-deny allows same namespace, the gateway, and control-plane entities
+    values: [../clusters/eks.yaml]
+    set: { layer: core }
+    template: templates/network-policies.yaml
+    documentSelector: { path: metadata.namespace, value: cert-manager }
+    asserts:
+      - equal:
+          path: spec.ingress
+          value:
+            - fromEndpoints: [{}]
+            - fromEndpoints:
+                [{ matchLabels: { k8s:io.kubernetes.pod.namespace: envoy-gateway-system } }]
+            - fromEntities: [kube-apiserver, host, remote-node, health]
+  - it: the gateway namespace accepts world and cluster traffic
+    values: [../clusters/eks.yaml]
+    set: { layer: core }
+    template: templates/network-policies.yaml
+    documentSelector: { path: metadata.namespace, value: envoy-gateway-system }
+    asserts:
+      - equal: { path: metadata.name, value: allow-gateway-ingress }
+      - equal: { path: spec.ingress, value: [{ fromEntities: [world, cluster] }] }
+  - it: argocd's policy comes from the cluster layer and admits kubechecks
+    values: [../clusters/eks.yaml]
+    set: { layer: cluster, clusterValuesFile: clusters/eks.yaml }
+    template: templates/network-policies.yaml
+    documentSelector: { path: metadata.namespace, value: argocd }
+    asserts:
+      - contains:
+          path: spec.ingress
+          content:
+            { fromEndpoints: [{ matchLabels: { k8s:io.kubernetes.pod.namespace: kubechecks } }] }
+  - it: the platform layer does not re-render argocd's policy
+    values: [../clusters/eks.yaml]
+    set: { layer: platform }
+    template: templates/network-policies.yaml
+    asserts:
+      - notEqual: { path: metadata.namespace, value: argocd }
+      - containsDocument:
+          {
+            kind: CiliumNetworkPolicy,
+            apiVersion: cilium.io/v2,
+            name: default-deny-ingress,
+            namespace: strimzi,
+            any: true,
+          }
+
+  - it: gatekeeper templates are installed from the library at a pinned commit
+    values: [../clusters/eks.yaml]
+    set: { layer: core }
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: gatekeeper-templates-psp }
+    asserts:
+      - equal:
+          {
+            path: spec.source.repoURL,
+            value: https://github.com/open-policy-agent/gatekeeper-library.git,
+          }
+      - equal: { path: spec.source.path, value: library/pod-security-policy }
+      - matchRegex: { path: spec.source.targetRevision, pattern: "^[0-9a-f]{40}$" }
+  - it: constraints report in dryrun and skip privileged namespaces for host access
+    values: [../clusters/eks.yaml]
+    set: { layer: core }
+    template: templates/constraints.yaml
+    documentSelector: { path: kind, value: K8sPSPPrivilegedContainer }
+    asserts:
+      - equal: { path: spec.enforcementAction, value: dryrun }
+      - contains: { path: spec.match.excludedNamespaces, content: falco }
+      - contains: { path: spec.match.excludedNamespaces, content: kube-system }
+  - it: every baseline constraint is rendered
+    values: [../clusters/eks.yaml]
+    set: { layer: core }
+    template: templates/constraints.yaml
+    asserts:
+      - hasDocuments: { count: 6 }
+      - equal: { path: spec.enforcementAction, value: dryrun }

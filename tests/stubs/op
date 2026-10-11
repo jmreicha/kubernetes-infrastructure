@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+echo "op $*" >>"$CALLS"
+[ "${STUB_OP_FAIL:-}" = 1 ] && {
+  echo "op: item not found" >&2
+  exit 1
+}
+echo "SECRET-VALUE-for-$2"

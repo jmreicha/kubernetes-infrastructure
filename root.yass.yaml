@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://textla.dev/yass/v1.schema.json
+# yaml-language-server: $schema=https://shakefu.github.io/yass/v1.schema.json
 ---
 description: >
   Cluster foundation. Given a fresh Kubernetes cluster, a provider (eks or baremetal), and
@@ -9,66 +9,85 @@ description: >
   chart from a fixed catalog.
 version: v1
 related:
-- https://github.com/shakefu/yass
-- https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/
+  - https://github.com/shakefu/yass
+  - https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/
 ---
 spec: ClusterFoundation
 INPUT:
-- MUST: "accept a provider, which is exactly one of `eks` or `baremetal`"
-- MUST: "accept a cluster values file at `clusters/<cluster-name>.yaml`"
-  CONFORMS: spec/values@ClusterValues
-- MUST: accept a fresh cluster with no CNI installed and nothing yet installed by this project
-- WHEN: the provider is eks
-  MUST: install the eks variant of each layer
-  SEE: spec/core@Core.Eks
-- WHEN: the provider is baremetal
-  MUST: install the baremetal variant of each layer
-  SEE: spec/core@Core.Baremetal
+  - MUST: "accept a provider, which is exactly one of `eks` or `baremetal`"
+  - MUST: "accept a cluster values file at `clusters/<cluster-name>.yaml`"
+    CONFORMS: spec/values@ClusterValues
+  - MUST: accept a fresh cluster with no CNI installed and nothing yet installed by this project
+  - WHEN: the provider is eks
+    MUST: install the eks variant of each layer
+    SEE: spec/core@Core.Eks
+  - WHEN: the provider is baremetal
+    MUST: install the baremetal variant of each layer
+    SEE: spec/core@Core.Baremetal
 RETURN:
-- MUST: run the bootstrap layer, then the core layer, then the platform layer, each only after the previous layer has completed
-  SEE: spec/bootstrap@Bootstrap
-- MUST: report success only when every Application of every installed layer is Synced and Healthy
-  SEE: spec/platform@Platform
-- WHEN: the provider is baremetal
-  MUST: install the baremetal variant of the platform layer
-  SEE: spec/platform@Platform.Baremetal
-- WHEN: coreOnly is true in the cluster values
-  MUST: stop after the core layer, reporting success on the core layer alone
+  - MUST: run the bootstrap layer, then the core layer, then the platform layer, each only after the previous layer has completed, with the ordering enforced by the cluster root Application's sync waves
+    SEE: spec/bootstrap@Bootstrap
+  - MUST: "report success only when every Application of every installed layer is Synced and Healthy, as scripts/bootstrap-cluster does after handover unless run with `--no-wait`"
+    SEE: spec/platform@Platform
+  - WHEN: the provider is baremetal
+    MUST: install the baremetal variant of the platform layer
+    SEE: spec/platform@Platform.Baremetal
+  - WHEN: coreOnly is true in the cluster values
+    MUST: stop after the core layer, reporting success on the core layer alone
 ERROR:
-- WHEN: the provider is missing, or is any value other than `eks` or `baremetal`
-  MUST: fail before any change is made to the cluster, and name the accepted values
-- WHEN: the cluster values file is missing or fails ClusterValues validation
-  MUST: fail before any change is made to the cluster, and name each invalid or missing key
-- WHEN: a layer does not complete
-  MUST: fail without starting any later layer, and report which layer failed
-- MUST: fail, report the failure, and leave the cluster exactly as it stands, with nothing rolled back and nothing deleted
+  - WHEN: the provider is missing, or is any value other than `eks` or `baremetal`
+    MUST: fail before any change is made to the cluster, and name the accepted values
+  - WHEN: the cluster values file is missing or fails ClusterValues validation
+    MUST: fail before any change is made to the cluster, and name each invalid or missing key
+  - WHEN: a layer does not complete
+    MUST: fail without starting any later layer, and report which layer failed
+  - MUST: fail, report the failure, and leave the cluster exactly as it stands, with nothing rolled back and nothing deleted
 SIDE-EFFECT:
-- MUST-NOT: write a secret value to git, to a log, or to any file in this repository
+  - MUST-NOT: write a secret value to git, to a log, or to any file in this repository
 INVARIANT:
-- MUST: pass Verification before any change to this repository merges
-  SEE: spec/verification@Verification
-- USES: GitOpsConventions
-- USES: Catalog
+  - MUST: apply the security boundaries to everything it installs
+    CONFORMS: spec/security@Security
+  - MUST: pass Verification before any change to this repository merges
+    SEE: spec/verification@Verification
+  - USES: GitOpsConventions
+  - USES: Catalog
 ---
 design: GitOpsConventions
 type: constraint
 content: |
   Repository layout
     clusters/<cluster-name>.yaml   per-cluster values (see spec/values ClusterValues)
-    apps/                          Helm chart (the app-of-apps) that renders Argo CD
+    cluster/                       Helm chart (the app-of-apps) that renders Argo CD
                                    Applications for one layer and one provider
-    apps/values.yaml               catalog entries: project, chart, repoURL, version,
+    cluster/values.yaml               catalog entries: project, chart, repoURL, version,
                                    namespace, layer, providers, wave
-    bootstrap/<layer>.yaml         root Application per layer; points at apps/ with
-                                   values clusters/<cluster-name>.yaml and layer=<layer>
+    cluster/values.schema.json        the shape every catalog entry must have, checked on every render
+    scripts/bootstrap-cluster         the imperative bootstrap (spec/bootstrap)
+    policies/                        Rego: cluster values validation and render policies
+
+  Roots
+    The cluster/ chart renders by `layer`: cluster, core, or platform.
+    layer=cluster renders the AppProjects (wave -1), the cilium and argo-cd
+    Applications (wave 0), the core root Application (wave 1), and, unless coreOnly,
+    the platform root Application (wave 2). Bootstrap applies only the AppProjects and
+    the cluster root Application, which renders cluster/ with layer=cluster; Argo CD then
+    manages everything, including the cluster root itself.
+    Each layer root renders cluster/ with values clusters/<cluster-name>.yaml and
+    layer=<layer>. With the Application health check, the platform root does not sync
+    until the core root, and so every core Application, is Healthy.
 
   Argo CD
     One Argo CD per cluster, managing that cluster only (destination
     https://kubernetes.default.svc). Argo CD manages its own release after bootstrap.
     AppProject `core` is allowed cluster-scoped resources of any kind.
-    AppProject `platform` is allowed only CustomResourceDefinition,
-    ClusterRole, ClusterRoleBinding, MutatingWebhookConfiguration,
-    ValidatingWebhookConfiguration and Namespace as cluster-scoped kinds.
+    AppProject `platform` is allowed only the cluster-scoped kinds listed in
+    cluster/values.yaml `platformClusterKinds`: CustomResourceDefinition, ClusterRole,
+    ClusterRoleBinding, webhook configurations, Namespace, APIService, PriorityClass,
+    and the cluster-scoped custom resources its operators need.
+    An Application whose chart generates a value on every render (certificates, keys,
+    caBundles) lists that resource in ignoreDifferences and adds the
+    RespectIgnoreDifferences=true sync option, so it reports Synced and the generated
+    value is never regenerated by a sync.
     Argo CD carries a resource.customizations.health.argoproj.io_Application Lua
     check that reports a child Application's own health status, so a parent's sync
     waves wait for each child to be Healthy (Argo CD does not do this by default).
@@ -88,19 +107,21 @@ content: |
      4  every other platform-layer Application
 
   Version pinning
-    Every Application pins an exact chart version (targetRevision) in apps/values.yaml.
-    No ranges, no wildcards, no `latest`, no `HEAD`, no branch names.
+    A catalog entry whose upstream publishes no releases pins an exact commit SHA.
+    Every catalog Application pins an exact chart version (targetRevision) in
+    cluster/values.yaml. No ranges, no wildcards, no `latest`, no `HEAD`, no branch names.
+    The exception is Applications whose source is this repository (the cluster and
+    layer roots): they track `gitRevision` in cluster/values.yaml, `main` by default.
     Renovate updates the pins through a customManagers regex entry over
-    apps/values.yaml; the spec never states a version.
+    cluster/values.yaml; the spec never states a version.
 
   Gateway API CRDs
     The envoy-gateway Application is the only owner of the Gateway API CRDs. Cilium's
     Gateway API support stays disabled, and no other Application installs them.
 
   Namespaces
-    Each project installs into the namespace given in the catalog. On baremetal, every
-    namespace whose workloads need host access is labelled
-    pod-security.kubernetes.io/enforce=privileged.
+    Each project installs into the namespace given in the catalog. Namespace labels,
+    network policy, and admission constraints follow spec/security.
 ---
 design: Catalog
 type: table
@@ -110,25 +131,27 @@ content: |
   argo-cd                   argo-cd                     https://argoproj.github.io/argo-helm                        argocd                bootstrap eks,baremetal    0
   cert-manager              cert-manager                https://charts.jetstack.io                                  cert-manager          core      eks,baremetal    1
   gatekeeper                gatekeeper                  https://open-policy-agent.github.io/gatekeeper/charts       gatekeeper-system     core      eks,baremetal    1
+  gatekeeper-templates-psp     library/pod-security-policy  https://github.com/open-policy-agent/gatekeeper-library (git) gatekeeper-system core eks,baremetal 2
+  gatekeeper-templates-general library/general              https://github.com/open-policy-agent/gatekeeper-library (git) gatekeeper-system core eks,baremetal 2
   external-secrets          external-secrets            https://charts.external-secrets.io                          external-secrets      core      eks,baremetal    1
   onepassword-connect       connect                     https://1password.github.io/connect-helm-charts             onepassword           core      eks,baremetal    1
   karpenter                 karpenter                   oci://public.ecr.aws/karpenter                              kube-system           core      eks              1
   aws-ebs-csi-driver        aws-ebs-csi-driver          https://kubernetes-sigs.github.io/aws-ebs-csi-driver        kube-system           core      eks              1
   longhorn                  longhorn                    https://charts.longhorn.io                                  longhorn-system       core      baremetal        1
   local-path-provisioner    deploy/chart/local-path-provisioner https://github.com/rancher/local-path-provisioner (git) local-path-storage  core      baremetal        1
+  zot                       zot                         https://zotregistry.dev/helm-charts                        zot                   core      baremetal        2
   envoy-gateway             gateway-helm                oci://docker.io/envoyproxy                                  envoy-gateway-system  core      eks,baremetal    1
   external-dns              external-dns                https://kubernetes-sigs.github.io/external-dns              external-dns          core      eks,baremetal    2
-  aws-load-balancer-ctrl    aws-load-balancer-controller https://aws.github.io/eks-charts                           kube-system           core      eks              2
+  aws-load-balancer-controller aws-load-balancer-controller https://aws.github.io/eks-charts                           kube-system           core      eks              2
   falco                     falco                       https://falcosecurity.github.io/charts                      falco                 core      eks,baremetal    2
   metrics-server            metrics-server              https://kubernetes-sigs.github.io/metrics-server            kube-system           core      eks,baremetal    2
   kube-state-metrics        kube-state-metrics          https://prometheus-community.github.io/helm-charts          kube-system           core      eks,baremetal    2
   opentelemetry-operator    opentelemetry-operator      https://open-telemetry.github.io/opentelemetry-helm-charts  opentelemetry         core      eks,baremetal    2
   kor                       kor                         https://yonahd.github.io/kor                                kor                   core      eks,baremetal    2
-  kubechecks                kubechecks                  https://zapier.github.io/kubechecks                         kubechecks            core      eks,baremetal    2
   strimzi                   strimzi-kafka-operator      https://strimzi.io/charts                                   strimzi               platform  eks,baremetal    3
   openeverest               openeverest                 https://openeverest.github.io/helm-charts                   everest-system        platform  eks,baremetal    3
-  kubevirt                  kubevirt                    https://encircle360-oss.github.io/helm-charts               kubevirt              platform  baremetal        3
-  cdi                       cdi                         https://encircle360-oss.github.io/helm-charts               cdi                   platform  baremetal        4
+  kubevirt                  kubevirt                    oci://ghcr.io/naval-group/kubevirt-stack-charts             kubevirt              platform  baremetal        3
+  cdi                       cdi                         oci://ghcr.io/naval-group/kubevirt-stack-charts             cdi                   platform  baremetal        4
   crossplane                crossplane                  https://charts.crossplane.io/stable                         crossplane-system     platform  eks,baremetal    4
   keda                      keda                        https://kedacore.github.io/charts                           keda                  platform  eks,baremetal    4
   reloader                  reloader                    https://stakater.github.io/stakater-charts                  reloader              platform  eks,baremetal    4
@@ -136,11 +159,14 @@ content: |
   k6-operator               k6-operator                 https://grafana.github.io/helm-charts                       k6-operator-system    platform  eks,baremetal    4
   atlas-operator            atlas-operator              oci://ghcr.io/ariga/charts                                  atlas-operator        platform  eks,baremetal    4
   kargo                     kargo                       oci://ghcr.io/akuity/kargo-charts                           kargo                 platform  eks,baremetal    4
+  kubechecks                kubechecks                  https://zapier.github.io/kubechecks                         kubechecks            platform  eks,baremetal    4
 
   The catalog is closed: no project outside this table is installed by this project.
-  external-dns is optional: it is installed only when the cluster values carry a domain.
-  Every platform-layer entry is installed by default and may be disabled per cluster.
-  In core, only longhorn and local-path-provisioner may be disabled; local-path-provisioner
-  is installed only when longhorn is disabled.
-  local-path-provisioner is sourced from git at an exact release tag; every other entry is a
-  Helm chart.
+  external-dns and kubechecks are installed only when the cluster values carry a domain.
+  Optionality is the same in every layer. An entry marked `optional` is installed unless the
+  cluster values list it in `disable`; an entry marked `optIn` is installed only when they list
+  it in `enable`; every other entry is always installed. Every platform-layer entry, longhorn,
+  and local-path-provisioner are optional; zot is opt-in. local-path-provisioner is installed
+  only when longhorn is disabled.
+  local-path-provisioner and the gatekeeper-library templates are sourced from git; every other
+  entry is a Helm chart.

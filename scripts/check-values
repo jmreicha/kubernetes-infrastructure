@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Validate cluster values files against policies/values.rego (spec/values ClusterValues).
+# Usage: scripts/check-values <values.yaml>...
+set -euo pipefail
+root=$(cd "$(dirname "$0")/.." && pwd)
+data=$(mktemp -d)
+trap 'rm -rf "$data"' EXIT
+yq '{"catalog": .catalog}' "$root/cluster/values.yaml" >"$data/catalog.yaml"
+conftest test --policy "$root/policies" --namespace values --data "$data/catalog.yaml" "$@"

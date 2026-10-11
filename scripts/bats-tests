@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Run the fast bats tests, one file per process in parallel. tests/slow/ needs
+# Docker or real renders and runs in the manual stage instead.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+find tests -maxdepth 1 -name '*.bats' -print0 | xargs -0 -P 8 -n 1 bats

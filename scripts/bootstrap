@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Install the pinned tools (mise.toml) and git hooks. Bring up a cluster with scripts/bootstrap-cluster.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+mise install
+mise exec prek -- prek install

@@ -1,0 +1,14 @@
+clusterName: eks
+provider: eks
+kubernetesVersion: "1.34"
+apiServerHost: ABCDEF.gr7.us-west-2.eks.amazonaws.com
+apiServerPort: 443
+region: us-west-2
+vpcId: vpc-0123456789abcdef0
+domain: eks.example.com
+secretRefs:
+  onepasswordCredentials: op://infra/eks-connect/credentials
+  onepasswordToken: op://infra/eks-connect/token
+  kargoAdminPasswordHash: op://infra/eks-kargo/password-hash
+  kargoTokenSigningKey: op://infra/eks-kargo/signing-key
+  githubToken: op://infra/kubechecks/github-token

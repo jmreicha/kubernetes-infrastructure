@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# The bootstrap layer (spec/bootstrap): Cilium, seeded secrets, Argo CD, then the
+# AppProjects and cluster root. Everything after that is Argo CD's job.
+# Usage: scripts/bootstrap-cluster clusters/<name>.yaml [--no-wait]   (kubectl context = target cluster)
+# Without --no-wait it then waits for the core and platform layers and reports the outcome.
+set -euo pipefail
+root=$(cd "$(dirname "$0")/.." && pwd)
+values=${1:?usage: scripts/bootstrap-cluster clusters/<name>.yaml [--no-wait]}
+wait_layers=true
+[ "${2:-}" = --no-wait ] && wait_layers=false
+name=$(basename "$values" .yaml)
+rel="clusters/$name.yaml"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+# Isolated Helm cache so a broken local repo config can't affect installs.
+cache="$root/.cache/helm"
+mkdir -p "$cache"
+export HELM_REPOSITORY_CONFIG="$cache/repositories.yaml" HELM_REPOSITORY_CACHE="$cache/repo" HELM_CACHE_HOME="$cache/home"
+die() {
+  echo "bootstrap: $*" >&2
+  exit 1
+}
+val() { yq -r "$1" "$values"; }
+enabled() { [ "$(yq "(.disable // []) | contains([\"$1\"])" "$values")" = false ]; }
+
+# 1. Validate values before touching the cluster.
+"$root/scripts/check-values" "$values" >&2 \
+  || die "invalid cluster values in $values"
+[ "$(val .clusterName)" = "$name" ] || die "clusterName $(val .clusterName) does not match file name $name"
+provider=$(val .provider) domain=$(val '.domain // ""')
+
+# 2. Reach the cluster.
+kubectl cluster-info >/dev/null 2>&1 || die "cannot reach the API server for context $(kubectl config current-context 2>/dev/null)"
+
+# 3. Talos must run without kube-proxy and flannel.
+if [ "$provider" = baremetal ]; then
+  nodes=$(
+    kubectl get pods -A -l k8s-app=kube-proxy -o jsonpath='{.items[*].spec.nodeName}'
+    kubectl get pods -A -l app=flannel -o jsonpath='{.items[*].spec.nodeName}'
+  )
+  [ -z "${nodes// /}" ] || die "kube-proxy or flannel runs on: $nodes; disable both in the Talos machine config"
+fi
+
+# Install a bootstrap Application's chart exactly as Argo CD will later render it.
+render() { helm template cluster "$root/cluster" -f "$values" --set layer="$1" --set clusterValuesFile="$rel"; }
+render cluster >"$tmp/cluster.yaml"
+install() {
+  local app
+  app=$(yq "select(.kind == \"Application\" and .metadata.name == \"$1\")" "$tmp/cluster.yaml")
+  yq '.spec.source.helm.valuesObject // {}' <<<"$app" >"$tmp/$1.values.yaml"
+  helm upgrade --install "$1" "$(yq .spec.source.chart <<<"$app")" \
+    --repo "$(yq .spec.source.repoURL <<<"$app")" --version "$(yq .spec.source.targetRevision <<<"$app")" \
+    --namespace "$(yq .spec.destination.namespace <<<"$app")" --create-namespace -f "$tmp/$1.values.yaml"
+}
+
+# A bring-your-own StorageClass is provided outside this project, so it must already be the only default.
+if [ "$(val '.defaultStorageClass // ""')" != "" ]; then
+  defaults=$(kubectl get storageclass -o jsonpath='{range .items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")]}{.metadata.name} {end}')
+  [ "$(xargs <<<"$defaults")" = "$(val .defaultStorageClass)" ] \
+    || die "defaultStorageClass $(val .defaultStorageClass) must exist and be the only default StorageClass (defaults: ${defaults:-none})"
+fi
+
+# 4. CNI first; on EKS it replaces the VPC CNI.
+# Talos may already have installed it from scripts/talos-cilium-patch; Argo CD adopts it.
+if kubectl -n kube-system get daemonset cilium >/dev/null 2>&1; then
+  echo "bootstrap: Cilium is already installed; leaving it for Argo CD to adopt" >&2
+else
+  install cilium
+fi
+if [ "$provider" = eks ]; then
+  kubectl -n kube-system delete daemonset aws-node --ignore-not-found
+  ! kubectl -n kube-system get daemonset aws-node >/dev/null 2>&1 || die "the AWS VPC CNI (aws-node) is still present"
+fi
+kubectl wait --for=condition=Ready nodes --all --timeout=10m >/dev/null \
+  || die "nodes not Ready within 10m: $(kubectl get nodes --no-headers | awk '$2 != "Ready" {print $1}' | xargs)"
+
+# 5. Seed secrets (SecretSeed). Values flow through pipes only, never argv or logs.
+seed() { # namespace secret key=op://ref|- ...   ('-' reads the value from stdin)
+  local ns=$1 secret=$2
+  shift 2
+  kubectl get secret "$secret" -n "$ns" >/dev/null 2>&1 && return 0
+  local args=() i=0
+  for kv in "$@"; do
+    local k=${kv%%=*} ref=${kv#*=}
+    if [ "$ref" = - ]; then cat >"$tmp/s$i"; else op read "$ref" >"$tmp/s$i" || die "op read failed for $ref"; fi
+    args+=("--from-file=$k=$tmp/s$i")
+    i=$((i + 1))
+  done
+  kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl create secret generic "$secret" -n "$ns" "${args[@]}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  rm -f "$tmp"/s*
+}
+seed onepassword op-credentials "1password-credentials.json=$(val .secretRefs.onepasswordCredentials)"
+seed onepassword onepassword-token "token=$(val .secretRefs.onepasswordToken)"
+enabled kargo && seed kargo kargo-admin \
+  "ADMIN_ACCOUNT_PASSWORD_HASH=$(val .secretRefs.kargoAdminPasswordHash)" \
+  "ADMIN_ACCOUNT_TOKEN_SIGNING_KEY=$(val .secretRefs.kargoTokenSigningKey)"
+[ -n "$domain" ] && [ "$provider" = baremetal ] \
+  && seed external-dns cloudflare-api-token "token=$(val .secretRefs.cloudflareApiToken)"
+
+# 6. Argo CD.
+install argo-cd
+kubectl -n argocd rollout status deployment/argo-cd-argocd-server --timeout=10m >/dev/null
+
+# The kubechecks Argo CD token only exists once Argo CD runs; generated once, then kept.
+if [ -n "$domain" ] && enabled kubechecks && ! kubectl get secret kubechecks-tokens -n kubechecks >/dev/null 2>&1; then
+  kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d >"$tmp/pw"
+  kubectl -n argocd exec -i deployment/argo-cd-argocd-server -- sh -c \
+    'read -r pw; argocd login localhost:8080 --insecure --username admin --password "$pw" >/dev/null && argocd account generate-token --account kubechecks' \
+    <"$tmp/pw" >"$tmp/argo-token"
+  rm -f "$tmp/pw"
+  op read "$(val .secretRefs.githubToken)" >"$tmp/gh" || die "op read failed for $(val .secretRefs.githubToken)"
+  kubectl create namespace kubechecks --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl create secret generic kubechecks-tokens -n kubechecks \
+    --from-file=KUBECHECKS_VCS_TOKEN="$tmp/gh" --from-file=KUBECHECKS_ARGOCD_API_TOKEN="$tmp/argo-token" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+fi
+
+# 7. Hand over: AppProjects and the cluster root, then wait for Argo CD to adopt both releases.
+render bootstrap | kubectl apply -f - >/dev/null
+for app in cilium argo-cd; do
+  kubectl -n argocd wait "application/$app" --for=jsonpath='{.status.health.status}'=Healthy --timeout=10m >/dev/null \
+    && kubectl -n argocd wait "application/$app" --for=jsonpath='{.status.sync.status}'=Synced --timeout=10m >/dev/null \
+    || die "Application $app is not Synced and Healthy within 10m"
+done
+echo "bootstrap: $name handed to Argo CD" >&2
+$wait_layers || exit 0
+
+# 8. Report each layer (ClusterFoundation): the root is Healthy once every child is.
+layers=core
+[ "$(val '.coreOnly // false')" = true ] || layers="core platform"
+for layer in $layers; do
+  if ! { kubectl -n argocd wait "application/root-$layer" --for=jsonpath='{.status.health.status}'=Healthy --timeout=30m >/dev/null \
+    && kubectl -n argocd wait "application/root-$layer" --for=jsonpath='{.status.sync.status}'=Synced --timeout=5m >/dev/null; }; then
+    bad=$(kubectl -n argocd get applications -l "layer=$layer" -o jsonpath='{range .items[?(@.status.health.status!="Healthy")]}{.metadata.name} {.status.health.status}{"\n"}{end}')
+    die "$layer layer not Synced and Healthy within 30m:"$'\n'"$bad"
+  fi
+done
+echo "bootstrap: every Application of $layers is Synced and Healthy" >&2

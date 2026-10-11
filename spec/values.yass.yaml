@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://textla.dev/yass/v1.schema.json
+# yaml-language-server: $schema=https://shakefu.github.io/yass/v1.schema.json
 ---
 description: >
   The per-cluster values file. It is the only per-cluster input; every Application reads
@@ -7,43 +7,52 @@ version: v1
 ---
 spec: ClusterValues
 INPUT:
-- MUST: "be a YAML mapping at `clusters/<cluster-name>.yaml`"
-- MUST: "carry `clusterName`, a string equal to `<cluster-name>` in the file name"
-- MUST: "carry `provider`, exactly one of `eks` or `baremetal`"
-- MUST: "carry `apiServerHost` and `apiServerPort`, the address Cilium uses in place of kube-proxy"
-- MAY: "carry `domain`, the DNS zone external-dns manages; external-dns is installed only when it is present"
-- MUST: "carry `secretRefs.onepasswordCredentials` and `secretRefs.onepasswordToken`, each an op:// reference"
-- WHEN: kargo is not disabled
-  MUST: "carry `secretRefs.kargoAdminPasswordHash` and `secretRefs.kargoTokenSigningKey`, each an op:// reference"
-- WHEN: provider is baremetal and domain is present
-  MUST: "carry `secretRefs.cloudflareApiToken`, an op:// reference"
-- WHEN: provider is eks
-  MUST: "carry `region` and `vpcId`"
-- WHEN: provider is baremetal
-  MUST: "carry `lbIpPool`, a list of one or more CIDRs that Cilium LB-IPAM allocates LoadBalancer addresses from"
-- WHEN: provider is baremetal
-  SHOULD: "set `apiServerHost` to `localhost` and `apiServerPort` to `7445`, the Talos KubePrism endpoint"
-- MUST: "carry `kubernetesVersion`, the cluster's Kubernetes minor version, such as `1.34`"
-- MAY: "carry `coreOnly: true`, which stops installation after the core layer"
-- MAY: "carry `disable`, a list of catalog project names that are not installed on this cluster: any platform-layer name, `longhorn`, or `local-path-provisioner`"
-- WHEN: provider is baremetal and both longhorn and local-path-provisioner are disabled
-  MUST: "carry `defaultStorageClass`, the name of a StorageClass provided outside this project"
-- WHEN: "`disable` names a project in the list above that the catalog does not offer for this provider"
-  MUST: accept it as having no effect
+  - MUST: "be a YAML mapping at `clusters/<cluster-name>.yaml`"
+  - MUST: "carry `clusterName`, a string equal to `<cluster-name>` in the file name"
+  - MUST: "carry `provider`, exactly one of `eks` or `baremetal`"
+  - MUST: "carry `apiServerHost` and `apiServerPort`, the address Cilium uses in place of kube-proxy"
+  - MAY: "carry `domain`, the DNS zone external-dns manages; external-dns is installed only when it is present"
+  - MUST: "carry `secretRefs.onepasswordCredentials` and `secretRefs.onepasswordToken`, each an op:// reference"
+  - WHEN: kargo is not disabled
+    MUST: "carry `secretRefs.kargoAdminPasswordHash` and `secretRefs.kargoTokenSigningKey`, each an op:// reference"
+  - WHEN: provider is baremetal and domain is present
+    MUST: "carry `secretRefs.cloudflareApiToken`, an op:// reference"
+  - WHEN: domain is present and kubechecks is not disabled
+    MUST: "carry `secretRefs.githubToken`, an op:// reference"
+  - WHEN: provider is eks
+    MUST: "carry `region` and `vpcId`"
+  - WHEN: provider is baremetal
+    MUST: "carry `lbIpPool`, a list of one or more CIDRs that Cilium LB-IPAM allocates LoadBalancer addresses from"
+  - WHEN: provider is baremetal
+    SHOULD: "set `apiServerHost` to `localhost` and `apiServerPort` to `7445`, the Talos KubePrism endpoint"
+  - MUST: "carry `kubernetesVersion`, the cluster's Kubernetes minor version, such as `1.34`"
+  - MAY: "carry `coreOnly: true`, which stops installation after the core layer"
+  - MAY: "carry `disable`, a list of catalog entries marked `optional`, which are then not installed on this cluster"
+  - MAY: "carry `enable`, a list of catalog entries marked `optIn`, which are installed only when listed here"
+  - WHEN: zot is enabled
+    MUST: "carry `pullThroughCacheIp`, an address in `lbIpPool` that the zot LoadBalancer Service takes and nodes use as their registry mirror"
+  - WHEN: provider is baremetal and both longhorn and local-path-provisioner are disabled
+    MUST: "carry `defaultStorageClass`, the name of a StorageClass provided outside this project"
+  - WHEN: "`disable` or `enable` names an entry that the catalog does not offer for this provider"
+    MUST: accept it as having no effect
 RETURN:
-- MUST: yield the values passed to the apps/ chart for every layer of this cluster
+  - MUST: yield the values passed to the cluster/ chart for every layer of this cluster
 ERROR:
-- WHEN: a required key is missing
-  MUST: be rejected, naming the missing key
-- WHEN: a key is present with the wrong type, provider is outside the accepted set, or a secretRefs value does not begin with op://
-  MUST: be rejected, naming the key and the expected form
-- WHEN: "`disable` names a bootstrap project, a core project other than longhorn or local-path-provisioner, or a name not in the catalog"
-  MUST: be rejected, naming the entry and listing the names that may be disabled
-- WHEN: "`defaultStorageClass` is present while longhorn or local-path-provisioner is not disabled, or provider is eks"
-  MUST: be rejected, because the cluster would have two candidate default StorageClasses
-- WHEN: clusterName does not equal the file name stem
-  MUST: be rejected, naming both values
-- MUST: be rejected, naming the offending key, for any key not listed in this spec
+  - WHEN: a required key is missing
+    MUST: be rejected, naming the missing key
+  - WHEN: a key is present with the wrong type, provider is outside the accepted set, or a secretRefs value does not begin with op://
+    MUST: be rejected, naming the key and the expected form
+  - WHEN: "`disable` names an entry not marked `optional`, or `enable` names an entry not marked `optIn`"
+    MUST: be rejected, naming the entry and listing the names that may be disabled or enabled
+  - WHEN: "`pullThroughCacheIp` is present while zot is not enabled"
+    MUST: be rejected
+  - WHEN: provider is eks and zot is enabled
+    MUST: be rejected, pointing to an ECR pull-through cache configured outside the cluster
+  - WHEN: "`defaultStorageClass` is present while longhorn or local-path-provisioner is not disabled, or provider is eks"
+    MUST: be rejected, because the cluster would have two candidate default StorageClasses
+  - WHEN: clusterName does not equal the file name stem
+    MUST: be rejected, naming both values
+  - MUST: be rejected, naming the offending key, for any key not listed in this spec
 SIDE-EFFECT:
-- MUST-NOT: carry a secret value; it carries only op:// references, which SecretSeed resolves
-  SEE: ./bootstrap@SecretSeed
+  - MUST-NOT: carry a secret value; it carries only op:// references, which SecretSeed resolves
+    SEE: ./bootstrap@SecretSeed

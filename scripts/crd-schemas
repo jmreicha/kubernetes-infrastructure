@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Convert CRDs in a manifest stream into strict kubeconform schemas.
+# Usage: scripts/crd-schemas <manifests.yaml> <out-dir>  -> <out>/<group>/<kind>_<version>.json
+set -euo pipefail
+in=$1 out=$2
+yq -N -o json -I0 'select(.kind == "CustomResourceDefinition")' "$in" \
+  | jq -c '.spec as $s | $s.versions[] | select(.schema.openAPIV3Schema)
+    | {group: $s.group, kind: ($s.names.kind | ascii_downcase), version: .name, schema: .schema.openAPIV3Schema}' \
+  | while read -r v; do
+    dir="$out/$(jq -r .group <<<"$v")"
+    mkdir -p "$dir"
+    # Strict: objects with declared properties reject unknown fields, unless preserved.
+    jq '.schema | walk(if type == "object" and has("properties") and (has("additionalProperties") | not)
+          and ((."x-kubernetes-preserve-unknown-fields" // false) | not)
+        then . + {additionalProperties: false} else . end)' <<<"$v" \
+      >"$dir/$(jq -r '.kind + "_" + .version' <<<"$v").json"
+  done

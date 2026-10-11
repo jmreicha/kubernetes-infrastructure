@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://textla.dev/yass/v1.schema.json
+# yaml-language-server: $schema=https://shakefu.github.io/yass/v1.schema.json
 ---
 description: >
   The bootstrap layer. The only imperative step in the project. It installs the CNI and
@@ -8,57 +8,65 @@ version: v1
 ---
 spec: Bootstrap
 INPUT:
-- CONFORMS: ./values@ClusterValues::INPUT
-- MUST: accept a kubeconfig whose context points at the target cluster with cluster-admin rights
-- MUST: "accept read access to 1Password through `op`, for the Secrets seeded by SecretSeed"
-  SEE: SecretSeed
+  - CONFORMS: ./values@ClusterValues::INPUT
+  - MUST: accept a kubeconfig whose context points at the target cluster with cluster-admin rights
+  - MUST: "accept read access to 1Password through `op`, for the Secrets seeded by SecretSeed"
+    SEE: SecretSeed
 RETURN:
-- MUST: complete only when every node reports Ready and the argo-cd and cilium Applications are Synced and Healthy, which means Argo CD has adopted both Helm releases
-- MUST: guarantee on completion that every Secret listed by SecretSeed exists
-  CONFORMS: SecretSeed::RETURN
-- MUST: guarantee on completion that the AppProjects and the core root Application have been applied
+  - MUST: complete only when every node reports Ready and the argo-cd and cilium Applications are Synced and Healthy, which means Argo CD has adopted both Helm releases
+  - MUST: guarantee on completion that every Secret listed by SecretSeed exists
+    CONFORMS: SecretSeed::RETURN
+  - MUST: guarantee on completion that the AppProjects and the cluster root Application have been applied
 SIDE-EFFECT:
-- MUST: "install Cilium with `helm install`, at the catalog version, with kubeProxyReplacement enabled, Hubble enabled, Gateway API support disabled, and k8sServiceHost/k8sServicePort from apiServerHost/apiServerPort"
-- WHEN: provider is eks
-  MUST: install Cilium in ENI IPAM mode and remove the AWS VPC CNI (the aws-node DaemonSet)
-- WHEN: provider is baremetal
-  MUST: install Cilium with LB-IPAM enabled over lbIpPool, L2 announcements enabled, and the Talos cgroup and capability settings
-- MUST: "install Argo CD with `helm install` after every node reports Ready, with the Application health customization from GitOpsConventions"
-  USES: ../root@GitOpsConventions
-- MUST: seed every Secret before any core Application is applied
-  SEE: SecretSeed
-- MUST: apply the AppProjects and the core root Application last
+  - WHEN: a cilium DaemonSet already runs in kube-system, as when Talos installed it during its own bootstrap
+    MUST: skip installing Cilium and leave it for Argo CD to adopt
+  - WHEN: provider is baremetal
+    MUST: "provide `scripts/talos-cilium-patch`, which renders a Talos machine-config patch that disables the Talos CNI and kube-proxy and installs, as an inline manifest, the catalog's Cilium chart at its pinned version and values"
+  - WHEN: provider is baremetal
+    SHOULD: "remove that inline manifest from the machine config once Argo CD has adopted Cilium, because `talosctl upgrade-k8s` re-applies inline manifests and would revert later Cilium upgrades"
+  - MUST: "install Cilium with `helm install`, at the catalog version, with kubeProxyReplacement enabled, Hubble enabled, Gateway API support disabled, and k8sServiceHost/k8sServicePort from apiServerHost/apiServerPort"
+  - WHEN: provider is eks
+    MUST: install Cilium in ENI IPAM mode and remove the AWS VPC CNI (the aws-node DaemonSet)
+  - WHEN: provider is baremetal
+    MUST: install Cilium with LB-IPAM enabled over lbIpPool, L2 announcements enabled, and the Talos cgroup and capability settings
+  - MUST: "install Argo CD with `helm install` after every node reports Ready, with the Application health customization from GitOpsConventions and a local `kubechecks` account with the apiKey capability and read-only RBAC"
+    USES: ../root@GitOpsConventions
+  - MUST: seed every Secret before any core Application is applied
+    SEE: SecretSeed
+  - MUST: apply the AppProjects and the cluster root Application last, rendered from the cluster/ chart with layer=cluster
 ERROR:
-- WHEN: the kubeconfig context cannot reach the API server
-  MUST: fail before installing anything, naming the context
-- WHEN: provider is eks and the aws-node DaemonSet cannot be removed
-  MUST: fail after installing nothing beyond Cilium, and report that the VPC CNI is still present
-- WHEN: provider is baremetal and any node runs kube-proxy or flannel
-  MUST: fail before installing Cilium, naming the nodes, because the Talos machine config must disable both
-- WHEN: nodes do not all report Ready within 10 minutes of installing Cilium
-  MUST: fail, naming the nodes that are not Ready
-- WHEN: Argo CD has not adopted both releases within 10 minutes
-  MUST: fail, naming the Application that is not Synced and Healthy
-- MUST: fail, report the failing step, and leave the cluster as it stands
+  - WHEN: the kubeconfig context cannot reach the API server
+    MUST: fail before installing anything, naming the context
+  - WHEN: provider is eks and the aws-node DaemonSet cannot be removed
+    MUST: fail after installing nothing beyond Cilium, and report that the VPC CNI is still present
+  - WHEN: provider is baremetal and any node runs kube-proxy or flannel
+    MUST: fail before installing Cilium, naming the nodes, because the Talos machine config must disable both
+  - WHEN: nodes do not all report Ready within 10 minutes of installing Cilium
+    MUST: fail, naming the nodes that are not Ready
+  - WHEN: Argo CD has not adopted both releases within 10 minutes
+    MUST: fail, naming the Application that is not Synced and Healthy
+  - MUST: fail, report the failing step, and leave the cluster as it stands
 INVARIANT:
-- MUST-NOT: install any project other than Cilium and Argo CD imperatively
-- MUST: be safe to re-run against a cluster it has already bootstrapped, changing nothing that is already in the desired state
+  - MUST-NOT: install any project other than Cilium and Argo CD imperatively
+  - MUST: be safe to re-run against a cluster it has already bootstrapped, changing nothing that is already in the desired state
 ---
 spec: SecretSeed
 INPUT:
-- MUST: "read each secret with `op read`, using the op:// reference named for it in the cluster values"
-  CONFORMS: ./values@ClusterValues::INPUT
+  - MUST: "read each secret with `op read`, using the op:// reference named for it in the cluster values"
+    CONFORMS: ./values@ClusterValues::INPUT
 RETURN:
-- MUST: "yield, in namespace `onepassword`, the Connect credentials and operator token Secrets the connect chart expects"
-- WHEN: kargo is not disabled in the cluster values
-  MUST: "yield, in namespace `kargo`, a Secret holding the Kargo admin password hash and token signing key, which the kargo Application reads instead of chart values"
-- WHEN: the cluster values carry a domain and provider is baremetal
-  MUST: "yield, in namespace `external-dns`, a Secret holding the Cloudflare API token"
+  - MUST: "yield, in namespace `onepassword`, the Connect credentials and operator token Secrets the connect chart expects"
+  - WHEN: kargo is not disabled in the cluster values
+    MUST: "yield, in namespace `kargo`, a Secret holding the Kargo admin password hash and token signing key, which the kargo Application reads instead of chart values"
+  - WHEN: the cluster values carry a domain and provider is baremetal
+    MUST: "yield, in namespace `external-dns`, a Secret holding the Cloudflare API token"
+  - WHEN: the cluster values carry a domain and kubechecks is not disabled
+    MUST: "yield, in namespace `kubechecks`, a Secret holding the GitHub token read with `op read` and an Argo CD API token for a local `kubechecks` account, generated once Argo CD is running"
 SIDE-EFFECT:
-- MUST: create each namespace and Secret before the Application that reads it is applied
-- MUST: leave a Secret that already exists with the same data unchanged, so a re-run changes nothing
-- MUST-NOT: write any secret value to git, to a file, or to a log
+  - MUST: create each namespace and Secret before the Application that reads it is applied
+  - MUST: leave a Secret that already exists unchanged, so a re-run changes nothing and generates no new Argo CD token
+  - MUST-NOT: write any secret value to git, to a file, or to a log
 ERROR:
-- WHEN: "`op read` fails for any reference"
-  MUST: fail the bootstrap layer before any core Application is applied, naming the reference and never printing a value
-- MUST: fail the bootstrap layer and report the step
+  - WHEN: "`op read` fails for any reference"
+    MUST: fail the bootstrap layer before any core Application is applied, naming the reference and never printing a value
+  - MUST: fail the bootstrap layer and report the step

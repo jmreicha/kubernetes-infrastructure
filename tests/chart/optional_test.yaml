@@ -1,0 +1,32 @@
+# Optional (disable) and opt-in (enable) catalog entries, the same in every layer.
+suite: optional
+templates: [templates/applications.yaml]
+tests:
+  - it: an opt-in component is off by default
+    values: [../clusters/baremetal.yaml]
+    set: { layer: core, enable: [], pullThroughCacheIp: "" }
+    asserts:
+      - notEqual: { path: metadata.name, value: zot }
+  - it: enabling zot renders it as a LoadBalancer on the requested IP
+    values: [../clusters/baremetal.yaml]
+    set: { layer: core, enable: [zot], pullThroughCacheIp: 10.10.0.5 }
+    documentSelector: { path: metadata.name, value: zot }
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.service.type, value: LoadBalancer }
+      - equal:
+          path: 'spec.source.helm.valuesObject.service.annotations["lbipam.cilium.io/ips"]'
+          value: 10.10.0.5
+      - equal: { path: spec.source.helm.valuesObject.persistence, value: true }
+  - it: zot mirrors each upstream registry on demand under its host name
+    values: [../clusters/baremetal.yaml]
+    set: { layer: core, enable: [zot], pullThroughCacheIp: 10.10.0.5 }
+    documentSelector: { path: metadata.name, value: zot }
+    asserts:
+      - matchRegex:
+          path: 'spec.source.helm.valuesObject.configFiles["config.json"]'
+          pattern: '"urls":\s*\["https://registry-1.docker.io"\],\s*"onDemand":\s*true,\s*"tlsVerify":\s*true,\s*"content":\s*\[\{"prefix":\s*"\*\*",\s*"destination":\s*"/docker.io"\}\]'
+  - it: an optional core component can be disabled the same way as a platform one
+    values: [../clusters/baremetal.yaml]
+    set: { layer: core, disable: [longhorn] }
+    asserts:
+      - notEqual: { path: metadata.name, value: longhorn }

@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://textla.dev/yass/v1.schema.json
+# yaml-language-server: $schema=https://shakefu.github.io/yass/v1.schema.json
 ---
 description: >
   How a change to this repository is verified before merge, without a real cluster. Two
@@ -8,70 +8,78 @@ description: >
   see docs/design.md.
 version: v1
 related:
-- https://github.com/yannh/kubeconform
-- https://github.com/CustomResourceDefinition/catalog
-- https://www.conftest.dev/
-- https://kwok.sigs.k8s.io/
+  - https://github.com/yannh/kubeconform
+  - https://github.com/CustomResourceDefinition/catalog
+  - https://www.conftest.dev/
+  - https://kwok.sigs.k8s.io/
 ---
 spec: Verification
 INPUT:
-- MUST: "accept one fixture values file per provider, `tests/clusters/eks.yaml` and `tests/clusters/baremetal.yaml`, each with a domain set and nothing disabled"
-  CONFORMS: ./values@ClusterValues::INPUT
-- MUST: "accept one further fixture per provider with no domain and every platform-layer Application disabled, `tests/clusters/<provider>-minimal.yaml`; the baremetal one also disables longhorn, so local-path-provisioner is exercised"
-- MUST: run on every pull request, including Renovate pull requests that change a pinned version
+  - MUST: "accept one fixture values file per provider, `tests/clusters/eks.yaml` and `tests/clusters/baremetal.yaml`, each with a domain set and nothing disabled"
+    CONFORMS: ./values@ClusterValues::INPUT
+  - MUST: "accept one further fixture per provider with no domain and every platform-layer Application disabled, `tests/clusters/<provider>-minimal.yaml`; the baremetal one also disables longhorn, so local-path-provisioner is exercised"
+  - MUST: run on every pull request, including Renovate pull requests that change a pinned version
 RETURN:
-- MUST: pass only when every check of both tiers passes for every fixture
-- MUST: on failure, report each failing check with the fixture, the Application, and the offending resource
+  - MUST: pass only when every check of both tiers passes for every fixture
+  - MUST: on failure, report each failing check with the fixture, the Application, and the offending resource
 SIDE-EFFECT:
-- MUST-NOT: contact a real cluster, AWS, Cloudflare, or 1Password
-- MUST: delete every API-tier cluster it creates, whether the run passes or fails
+  - MUST-NOT: contact a real cluster, AWS, Cloudflare, or 1Password
+  - MUST: delete every API-tier cluster it creates, whether the run passes or fails
 INVARIANT:
-- CONFORMS: Verification.Render
-- CONFORMS: Verification.Api
-- CONFORMS: Verification.Risk
+  - CONFORMS: Verification.Render
+  - CONFORMS: Verification.Api
+  - CONFORMS: Verification.Risk
 ---
 spec: Verification.Render
 INPUT:
-- MUST: "render the app-of-apps chart with `helm template` for each fixture and each layer"
-- MUST: "render each resulting Application's chart with `helm template` at its pinned version and with the values that Application passes"
-- MUST: "use the same Helm and Kustomize versions that the pinned Argo CD release bundles, because a render that passes only with other versions proves nothing"
+  - MUST: "render the app-of-apps chart with `helm template` for each fixture and each layer"
+  - MUST: "render each resulting Application's chart with `helm template --skip-tests` at its pinned version and with the values that Application passes, because Argo CD never runs Helm tests"
+  - MUST: render each chart twice, to find resources whose content differs between renders
+  - MUST: "use the same Helm and Kustomize versions that the pinned Argo CD release bundles, because a render that passes only with other versions proves nothing"
 RETURN:
-- MUST: "pass only when kubeconform, in strict mode, accepts every rendered manifest, looking up schemas in this order: schemas generated from the CRDs rendered in this run, the default schema location, then the CustomResourceDefinition/catalog schemas at a pinned tag"
-- WHEN: no schema exists for a rendered custom resource in any of those locations
-  MUST: skip that resource in this tier rather than fail, because the API tier validates it against the pinned chart's own CRD
-  SEE: Verification.Api
-- MUST: pass only when every conftest Rego policy under policy/ passes against every rendered manifest
-- MUST: "fail when the rendered Applications for a fixture are not exactly the catalog entries for its provider and layer, minus external-dns when it has no domain and minus its disabled entries"
+  - MUST: "pass only when kubeconform, in strict mode, accepts every rendered manifest, looking up schemas in this order: schemas generated from the CRDs rendered in this run, the default schema location, then the CustomResourceDefinition/catalog schemas at a pinned tag"
+  - WHEN: no schema exists for a rendered custom resource in any of those locations
+    MUST: skip that resource in this tier rather than fail, because the API tier validates it against the pinned chart's own CRD
+    SEE: Verification.Api
+  - MUST: pass only when every conftest Rego policy under policies/ passes against every rendered manifest
+  - MUST: "fail when the rendered Applications for a fixture are not exactly the catalog entries for its provider and layer, minus external-dns when it has no domain and minus its disabled entries"
 SIDE-EFFECT:
-- MUST: "pin the CustomResourceDefinition/catalog tag in the repository, where Renovate updates it like any other pin"
-- MUST: "provide Rego policies that fail on: a targetRevision that is not an exact version; a missing or out-of-order sync-wave; an Application in the wrong AppProject; an Application missing automated sync, prune, selfHeal, retry, CreateNamespace, or ServerSideApply; a Gateway API CRD rendered by any Application other than envoy-gateway; a missing privileged PSA label on a baremetal namespace that requires one; an IRSA role annotation on eks; and a Secret with inline data in any rendered manifest"
+  - MUST: "pin the CustomResourceDefinition/catalog tag in the repository, where Renovate updates it like any other pin"
+  - MUST: report, without failing, APIs deprecated or removed in the next Kubernetes minor version
+  - MUST: fail when the Catalog table in root.yass.yaml and the catalog in cluster/values.yaml disagree on any entry's name, namespace, layer, providers, or wave
+  - MUST: validate the generated Talos patches with talosctl against a freshly generated Talos config
+  - MUST: prove its own failure paths end to end, with a deliberately broken catalog and a deliberately risky change
+  - MUST: "provide Rego policies that fail on: a targetRevision that is not an exact version; a missing or out-of-order sync-wave; an Application in the wrong AppProject; an Application missing automated sync, prune, selfHeal, retry, CreateNamespace, or ServerSideApply; a Gateway API CRD rendered by any Application other than envoy-gateway; a missing privileged PSA label on a baremetal namespace that requires one; an IRSA role annotation on eks; a Secret with inline data rendered by the cluster/ chart; a non-hook resource that differs between two renders and is not in its Application's ignoreDifferences; and a cluster-scoped kind rendered by a platform-layer Application that platformClusterKinds does not allow; and an image with no tag or digest, or tagged `latest`"
 ERROR:
-- WHEN: a chart cannot be fetched at its pinned version
-  MUST: fail, naming the chart, repoURL, and version
-- MUST: fail and report the check that could not run
+  - WHEN: a chart cannot be fetched at its pinned version
+    MUST: fail, naming the chart, repoURL, and version
+  - MUST: fail and report the check that could not run
 ---
 spec: Verification.Api
 INPUT:
-- CONFORMS: Verification.Render::INPUT
-- MUST: "create a kwok cluster (`kwokctl create cluster`) whose kube-apiserver version equals the fixture's `kubernetesVersion`"
+  - CONFORMS: Verification.Render::INPUT
+  - MUST: "create a kwok cluster (`kwokctl create cluster`) whose kube-apiserver version equals the fixture's `kubernetesVersion`"
 RETURN:
-- MUST: "pass only when, after applying every rendered CustomResourceDefinition, every other rendered manifest is accepted by `kubectl apply --dry-run=server`"
-- MUST: apply the manifests in sync-wave order, so a resource that needs a CRD from an earlier wave is validated against it
+  - MUST: "pass only when, after applying every rendered CustomResourceDefinition, every other rendered manifest is accepted by `kubectl apply --dry-run=server`"
+  - MUST: apply the manifests in sync-wave order, so a resource that needs a CRD from an earlier wave is validated against it
+  - MUST: place an object that names no namespace in its Application's destination namespace, as Argo CD does
+  - WHEN: a resource's kind is served by a CRD that an operator creates at runtime, so no rendered CRD defines it
+    MUST: skip that resource in this tier, because the render tier validates it against the CRD catalog
 ERROR:
-- WHEN: the kwok cluster cannot be created
-  MUST: fail, reporting the kwokctl error, with the API tier reported as failed rather than skipped
-- MUST: fail and report the manifest the API server rejected, with its error
+  - WHEN: the kwok cluster cannot be created
+    MUST: fail, reporting the kwokctl error, with the API tier reported as failed rather than skipped
+  - MUST: fail and report the manifest the API server rejected, with its error
 ---
 spec: Verification.Risk
 INPUT:
-- MUST: "render the full tree, as Verification.Render does, at the pull request's base commit and at its head commit, for every fixture"
-  SEE: Verification.Render
+  - MUST: "render the full tree, as Verification.Render does, at the pull request's base commit and at its head commit, for every fixture"
+    SEE: Verification.Render
 RETURN:
-- MUST: report every resource added, removed, or changed between the two renders, grouped by fixture and Application
-- MUST: "fail when the change deletes a CustomResourceDefinition, drops a served version from one, deletes a PersistentVolumeClaim, changes a StatefulSet's volumeClaimTemplates, changes a StorageClass, or changes an Application's destination namespace"
-- MUST: "report, without failing, any other deleted resource, any change to an AppProject, and any change to an admission webhook configuration"
-- MUST: pass when the change produces no failing finding
+  - MUST: report every resource added, removed, or changed between the two renders, grouped by fixture and Application
+  - MUST: "fail when the change deletes a CustomResourceDefinition, drops a served version from one, deletes a PersistentVolumeClaim, changes a StatefulSet's volumeClaimTemplates, changes a StorageClass, or changes an Application's destination namespace"
+  - MUST: "report, without failing, any other deleted resource, any change to an AppProject, and any change to an admission webhook configuration"
+  - MUST: pass when the change produces no failing finding
 ERROR:
-- WHEN: either commit cannot be rendered
-  MUST: fail, naming the commit and the render error
-- MUST: fail and report the comparison that could not run
+  - WHEN: either commit cannot be rendered
+    MUST: fail, naming the commit and the render error
+  - MUST: fail and report the comparison that could not run

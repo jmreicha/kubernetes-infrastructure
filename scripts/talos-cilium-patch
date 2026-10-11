@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Render a Talos 1.14 machine-config patch that installs the catalog's Cilium as an inline
+# manifest, so what Talos installs is exactly what Argo CD later adopts (spec/bootstrap).
+# Usage: scripts/talos-cilium-patch clusters/<name>.yaml > cilium-patch.yaml
+set -euo pipefail
+root=$(cd "$(dirname "$0")/.." && pwd)
+values=${1:?usage: scripts/talos-cilium-patch clusters/<name>.yaml}
+[ "$(yq .provider "$values")" = baremetal ] || {
+  echo "talos-cilium-patch: only for baremetal (Talos) clusters" >&2
+  exit 1
+}
+# Isolated Helm cache so a broken local repo config can't affect installs.
+cache="$root/.cache/helm"
+mkdir -p "$cache"
+export HELM_REPOSITORY_CONFIG="$cache/repositories.yaml" HELM_REPOSITORY_CACHE="$cache/repo" HELM_CACHE_HOME="$cache/home"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+app=$(helm template cluster "$root/cluster" -f "$values" --set layer=cluster --set clusterValuesFile=x \
+  | yq 'select(.kind == "Application" and .metadata.name == "cilium")')
+yq '.spec.source.helm.valuesObject' <<<"$app" >"$tmp/values.yaml"
+helm template cilium "$(yq .spec.source.chart <<<"$app")" --repo "$(yq .spec.source.repoURL <<<"$app")" \
+  --version "$(yq .spec.source.targetRevision <<<"$app")" --namespace kube-system -f "$tmp/values.yaml" \
+  >"$tmp/cilium.yaml"
+
+# Talos 1.14 multi-document config: drop Flannel and kube-proxy, add Cilium as an inline manifest.
+printf 'apiVersion: v1alpha1\nkind: KubeFlannelCNIConfig\n$patch: delete\n---\napiVersion: v1alpha1\nkind: KubeProxyConfig\nenabled: false\n---\n'
+manifest="$tmp/cilium.yaml" yq -n '
+  .apiVersion = "v1alpha1" | .kind = "KubeInlineManifestConfig" | .name = "cilium" |
+  .manifest = load_str(strenv(manifest))'

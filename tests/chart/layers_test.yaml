@@ -1,0 +1,404 @@
+# Which Applications the cluster/ chart renders, per fixture and layer (migrated from apps.bats).
+suite: layers
+templates: [templates/applications.yaml]
+tests:
+  - it: eks core layer renders exactly 16 Applications
+    values: [../clusters/eks.yaml]
+    set:
+      layer: core
+    asserts:
+      - hasDocuments: { count: 16 }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: gatekeeper-templates-psp,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: gatekeeper-templates-general,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: aws-ebs-csi-driver,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: aws-load-balancer-controller,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: cert-manager, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: envoy-gateway, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: external-dns, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: external-secrets, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: falco, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: gatekeeper, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: karpenter, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: kor, any: true }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: kube-state-metrics,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: metrics-server, any: true }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: onepassword-connect,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: opentelemetry-operator,
+            any: true,
+          }
+  - it: eks platform layer renders exactly 10 Applications
+    values: [../clusters/eks.yaml]
+    set:
+      layer: platform
+    asserts:
+      - hasDocuments: { count: 10 }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: argocd-image-updater,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: atlas-operator, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: crossplane, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: k6-operator, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: kargo, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: keda, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: kubechecks, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: openeverest, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: reloader, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: strimzi, any: true }
+  - it: eks-minimal core layer renders exactly 15 Applications
+    values: [../clusters/eks-minimal.yaml]
+    set:
+      layer: core
+    asserts:
+      - hasDocuments: { count: 15 }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: gatekeeper-templates-psp,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: gatekeeper-templates-general,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: aws-ebs-csi-driver,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: aws-load-balancer-controller,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: cert-manager, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: envoy-gateway, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: external-secrets, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: falco, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: gatekeeper, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: karpenter, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: kor, any: true }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: kube-state-metrics,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: metrics-server, any: true }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: onepassword-connect,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: opentelemetry-operator,
+            any: true,
+          }
+  - it: eks-minimal platform layer renders exactly 0 Applications
+    values: [../clusters/eks-minimal.yaml]
+    set:
+      layer: platform
+    asserts:
+      - hasDocuments: { count: 0 }
+  - it: baremetal core layer renders exactly 15 Applications
+    values: [../clusters/baremetal.yaml]
+    set:
+      layer: core
+    asserts:
+      - hasDocuments: { count: 15 }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: zot, any: true }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: gatekeeper-templates-psp,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: gatekeeper-templates-general,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: cert-manager, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: envoy-gateway, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: external-dns, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: external-secrets, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: falco, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: gatekeeper, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: kor, any: true }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: kube-state-metrics,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: longhorn, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: metrics-server, any: true }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: onepassword-connect,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: opentelemetry-operator,
+            any: true,
+          }
+  - it: baremetal platform layer renders exactly 12 Applications
+    values: [../clusters/baremetal.yaml]
+    set:
+      layer: platform
+    asserts:
+      - hasDocuments: { count: 12 }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: argocd-image-updater,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: atlas-operator, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: cdi, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: crossplane, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: k6-operator, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: kargo, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: keda, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: kubechecks, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: kubevirt, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: openeverest, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: reloader, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: strimzi, any: true }
+  - it: baremetal-minimal core layer renders exactly 13 Applications
+    values: [../clusters/baremetal-minimal.yaml]
+    set:
+      layer: core
+    asserts:
+      - hasDocuments: { count: 13 }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: gatekeeper-templates-psp,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: gatekeeper-templates-general,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: cert-manager, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: envoy-gateway, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: external-secrets, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: falco, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: gatekeeper, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: kor, any: true }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: kube-state-metrics,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: local-path-provisioner,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: metrics-server, any: true }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: onepassword-connect,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: opentelemetry-operator,
+            any: true,
+          }
+  - it: eks cluster layer renders the bootstrap Applications
+    values: [../clusters/eks.yaml]
+    set: { layer: cluster }
+    asserts:
+      - hasDocuments: { count: 2 }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: cilium, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: argo-cd, any: true }
+  - it: disabling kubevirt drops cdi too
+    values: [../clusters/baremetal.yaml]
+    set: { layer: platform, disable: [kubevirt] }
+    asserts:
+      - hasDocuments: { count: 10 }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: strimzi, any: true }
+  - it: an unknown layer fails rendering
+    values: [../clusters/eks.yaml]
+    set: { layer: bogus }
+    asserts:
+      - failedTemplate: { errorPattern: "layer must be one of" }
+  - it: every catalog Application pins an exact version
+    values: [../clusters/baremetal.yaml]
+    set: { layer: platform }
+    asserts:
+      - matchRegex: { path: spec.source.targetRevision, pattern: '^v?[0-9]+\.[0-9]+\.[0-9]+$' }
+  - it: OCI repoURLs drop the oci:// prefix for Argo CD
+    values: [../clusters/eks.yaml]
+    set: { layer: platform }
+    documentSelector: { path: metadata.name, value: kargo }
+    asserts:
+      - equal: { path: spec.source.repoURL, value: ghcr.io/akuity/kargo-charts }
+  - it: generated Secrets are ignored and kept on sync
+    values: [../clusters/eks.yaml]
+    set: { layer: platform }
+    documentSelector: { path: metadata.name, value: openeverest }
+    asserts:
+      - contains:
+          {
+            path: spec.ignoreDifferences,
+            content: { kind: Secret, name: everest-jwt, jsonPointers: [/data] },
+          }
+      - contains: { path: spec.syncPolicy.syncOptions, content: RespectIgnoreDifferences=true }
+  - it: external-dns syncs records so none go stale
+    values: [../clusters/eks.yaml]
+    set: { layer: core }
+    documentSelector: { path: metadata.name, value: external-dns }
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.policy, value: sync }
+  - it: metrics-server skips kubelet TLS verification on baremetal
+    values: [../clusters/baremetal.yaml]
+    set: { layer: core }
+    documentSelector: { path: metadata.name, value: metrics-server }
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.args, value: [--kubelet-insecure-tls] }
+  - it: metrics-server keeps kubelet TLS verification on eks
+    values: [../clusters/eks.yaml]
+    set: { layer: core }
+    documentSelector: { path: metadata.name, value: metrics-server }
+    asserts:
+      - notExists: { path: spec.source.helm.valuesObject.args }

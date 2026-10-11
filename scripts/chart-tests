@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Run the cluster/ chart's helm-unittest suites, which live in tests/chart/.
+# helm-unittest resolves -f inside the chart, so each suite is passed by absolute path.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+args=()
+for f in tests/chart/*_test.yaml; do args+=(-f "$PWD/$f"); done
+untt "${args[@]}" cluster

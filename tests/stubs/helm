@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Test stub: `template` runs the real helm; install/upgrade calls are recorded only.
+if [ "$1" = template ]; then exec "$REAL_HELM" "$@"; fi
+echo "helm $*" >>"$CALLS"

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: cluster
+description: App-of-apps that renders the Argo CD Applications for one layer (root.yass.yaml).
+type: application
+version: 0.1.0

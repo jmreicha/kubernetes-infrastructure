@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Render tier for every fixture, in parallel (spec/verification Verification.Render).
+# Usage: scripts/verify-render [out-dir]
+set -euo pipefail
+root=$(cd "$(dirname "$0")/.." && pwd)
+out=${1:-$root/.cache/render}
+source "$root/tests/tool-versions.env"
+catalog="https://raw.githubusercontent.com/CustomResourceDefinition/catalog/$CRD_CATALOG_REF/schema/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
+schemas="$root/.cache/kubeconform"
+mkdir -p "$schemas"
+
+check() { # values-file -> 0 when every render-tier check passes for that fixture
+  local values=$1 dir=$2 fail=0 minor
+  minor=$(yq .kubernetesVersion "$values")
+  rm -rf "$dir" && mkdir -p "$dir"
+  "$root/scripts/check-values" "$values" || return 1
+  "$root/scripts/render" "$values" "$dir" || return 1
+  cat "$dir"/charts/*.yaml "$dir"/apps/*.yaml >"$dir/all.yaml"
+  "$root/scripts/crd-schemas" "$dir/all.yaml" "$dir/schemas"
+  kubeconform -strict -summary -ignore-missing-schemas -cache "$schemas" \
+    -kubernetes-version "$minor.0" \
+    -schema-location default \
+    -schema-location "$dir/schemas/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json" \
+    -schema-location "$catalog" \
+    "$dir/all.yaml" || fail=1
+  conftest test --policy "$root/policies" --namespace render "$dir/bundle.json" || fail=1
+  "$root/scripts/check-apis" "$dir/charts" "$minor" || fail=1
+  # Look ahead: removals in the next minor are reported, not failed, so upgrades aren't a surprise.
+  echo "APIs removed or deprecated in Kubernetes ${minor%.*}.$((${minor#*.} + 1)) (report only):"
+  "$root/scripts/check-apis" --report-only "$dir/charts" "${minor%.*}.$((${minor#*.} + 1))"
+  return $fail
+}
+
+mkdir -p "$out"
+for values in "$root"/tests/clusters/*.yaml; do
+  f=$(basename "$values" .yaml)
+  { check "$values" "$out/$f" || touch "$out/$f.failed"; } >"$out/$f.log" 2>&1 &
+done
+wait
+
+fail=0
+for values in "$root"/tests/clusters/*.yaml; do
+  f=$(basename "$values" .yaml)
+  echo "== $f" >&2
+  cat "$out/$f.log" >&2
+  [ ! -e "$out/$f.failed" ] || fail=1
+  rm -f "$out/$f.failed"
+done
+exit $fail

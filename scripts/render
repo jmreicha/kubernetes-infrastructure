@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# Render the full tree for one fixture: cluster/ per layer, then every Application's chart
+# at its pin. Usage: scripts/render <values-file> <out-dir>   (spec/verification Render)
+set -euo pipefail
+values=$1 out=$2
+root=$(cd "$(dirname "$0")/.." && pwd)
+source "$root/tests/tool-versions.env"
+
+want=$(yq -p toml -oy '.tools.helm' "$root/mise.toml")
+have=$(helm version --template '{{.Version}}' | sed 's/^v//; s/+.*//')
+if [ "$have" != "$want" ]; then
+  msg="helm $have does not match Argo CD's bundled $want (mise.toml)"
+  # ponytail: drift is fatal in CI only, so local runs work with any helm 4.
+  [ "${CI:-}" = true ] && {
+    echo "$msg" >&2
+    exit 1
+  } || echo "warning: $msg" >&2
+fi
+
+# Isolated Helm cache so local repo config never affects the render.
+cache="$root/.cache/helm"
+mkdir -p "$cache"
+export HELM_REPOSITORY_CONFIG="$cache/repositories.yaml" HELM_REPOSITORY_CACHE="$cache/repo" HELM_CACHE_HOME="$cache/home"
+
+k8s=$(yq '.kubernetesVersion' "$values")
+mkdir -p "$out/apps" "$out/charts"
+rel=${values#"$root/"}
+for layer in cluster core platform; do
+  helm template cluster "$root/cluster" -f "$values" --set layer="$layer" --set clusterValuesFile="$rel" >"$out/apps/$layer.yaml"
+done
+
+# One render per catalog Application, in parallel (roots point back at this repo and are skipped).
+render_app() { # one Application JSON -> charts/<name>.yaml, .unstable.json
+  local app=$1 name ns url ver chart path src dir args pull key
+  name=$(jq -r .metadata.name <<<"$app")
+  ns=$(jq -r .spec.destination.namespace <<<"$app")
+  url=$(jq -r .spec.source.repoURL <<<"$app")
+  ver=$(jq -r .spec.source.targetRevision <<<"$app")
+  chart=$(jq -r '.spec.source.chart // ""' <<<"$app")
+  path=$(jq -r '.spec.source.path // ""' <<<"$app")
+  jq '.spec.source.helm.valuesObject // {}' <<<"$app" >"$out/charts/$name.values.json"
+  if [ -n "$path" ]; then
+    src="$root/.cache/git/$name-$ver"
+    if [ ! -d "$src" ]; then # a tag or a commit, fetched shallowly either way
+      git init -q "$src" && git -C "$src" fetch -q --depth 1 "$url" "$ver" && git -C "$src" -c advice.detachedHead=false checkout -q FETCH_HEAD
+    fi
+    args=(template "$name" "$src/$path" --namespace "$ns" --include-crds --skip-tests --kube-version "$k8s" -f "$out/charts/$name.values.json")
+    # Argo CD builds a git path with Kustomize when it has no Chart.yaml.
+    [ -f "$src/$path/Chart.yaml" ] || args=(kustomize "$src/$path")
+  else
+    # Download each chart version once; every later render is local and fast.
+    dir="${CHART_CACHE:-$root/.cache/charts}/${url//[^A-Za-z0-9.-]/_}/$chart-$ver"
+    if [ ! -f "$dir/$chart/Chart.yaml" ]; then
+      if [[ $url == http* ]]; then pull=("$chart" --repo "$url"); else pull=("oci://$url/$chart"); fi
+      helm pull "${pull[@]}" --version "$ver" --untar --untardir "$dir" >/dev/null 2>"$out/charts/$name.err" || {
+        echo "render failed: cannot pull $name $url $chart $ver" >&2
+        cat "$out/charts/$name.err" >&2
+        return 1
+      }
+    fi
+    args=(template "$name" "$dir/$chart" --namespace "$ns" --include-crds --skip-tests --kube-version "$k8s" -f "$out/charts/$name.values.json")
+  fi
+  # Helm 4 prints OCI pull notices on stdout; keep only manifests.
+  for n in 1 2; do
+    # Leading --- keeps documents separate when files are concatenated.
+    {
+      echo ---
+      if [ "${args[0]}" = kustomize ]; then kustomize build "${args[1]}"; else helm "${args[@]}"; fi
+    } 2>"$out/charts/$name.err" \
+      | grep -vE '^(Pulled|Digest): ' >"$out/charts/$name.yaml.$n" \
+      || {
+        echo "render failed: $name $url $chart $ver" >&2
+        cat "$out/charts/$name.err" >&2
+        return 1
+      }
+  done
+  mv "$out/charts/$name.yaml.1" "$out/charts/$name.yaml"
+  # Resources that differ between two renders are generated per render (spec Render).
+  key='select(.kind != null) | {"k": (.kind + "/" + .metadata.name), "v": .}'
+  jq -n --arg n "$name" \
+    --slurpfile a <(yq -N -o json -I0 "$key" "$out/charts/$name.yaml") \
+    --slurpfile b <(yq -N -o json -I0 "$key" "$out/charts/$name.yaml.2") \
+    '($b | map({(.k): .v}) | add // {}) as $m | {($n): [$a[] | select($m[.k] != .v) | {kind: .v.kind, name: .v.metadata.name, hook: ((.v.metadata.annotations // {}) | has("helm.sh/hook") or has("argocd.argoproj.io/hook"))}]}' \
+    >"$out/charts/$name.unstable.json"
+  rm "$out/charts/$name.yaml.2"
+}
+
+export -f render_app
+export root out k8s CHART_CACHE="${CHART_CACHE:-$root/.cache/charts}"
+jobs=${RENDER_JOBS:-8}
+cat "$out"/apps/*.yaml | yq -N -o json -I0 'select(.kind == "Application" and (.spec.source.repoURL | test("kubernetes-infrastructure") | not))' >"$out/apps.jsonl"
+while read -r app; do
+  # A fresh bash -e per job: errexit is ignored inside a function called from `||`.
+  bash -euo pipefail -c 'render_app "$1"' _ "$app" || touch "$out/failed" &
+  while [ "$(jobs -rp | wc -l)" -ge "$jobs" ]; do wait -n || true; done
+done <"$out/apps.jsonl"
+wait
+[ ! -e "$out/failed" ] || exit 1
+echo "rendered $(ls "$out"/charts/*.yaml | wc -l | tr -d ' ') charts for $rel" >&2
+
+# One JSON bundle per fixture for the Rego render policies.
+yq -o json -I0 '.' "$values" >"$out/cluster.json"
+cat "$out"/apps/*.yaml | yq -N -o json -I0 'select(.kind == "Application")' | jq -s . >"$out/apps.json"
+cat "$out"/apps/*.yaml | yq -N -o json -I0 'select(.kind != null and .kind != "Application")' | jq -s . >"$out/repo.json"
+for f in "$out"/charts/*.yaml; do
+  yq -N -o json -I0 'select(.kind != null)' "$f" | jq -s --arg n "$(basename "$f" .yaml)" '{($n): .}'
+done | jq -s 'add // {}' >"$out/charts.json"
+yq -o json '.platformClusterKinds' "$root/cluster/values.yaml" >"$out/kinds.json"
+jq -s 'add // {}' "$out"/charts/*.unstable.json >"$out/unstable.json"
+jq -n --slurpfile c "$out/cluster.json" --slurpfile a "$out/apps.json" --slurpfile r "$out/repo.json" \
+  --slurpfile ch "$out/charts.json" --slurpfile k "$out/kinds.json" --slurpfile u "$out/unstable.json" \
+  --argjson p "$(yq -o json -I0 '.privilegedNamespaces' "$root/cluster/values.yaml")" \
+  '{cluster: $c[0], apps: $a[0], repo: $r[0], charts: $ch[0], unstable: $u[0], platformClusterKinds: $k[0], privilegedNamespaces: $p}' >"$out/bundle.json"

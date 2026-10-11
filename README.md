@@ -1,86 +1,97 @@
 # Kubernetes Infrastructure
 
-Declarative (and slightly opinionated) infrastructure for Kubernetes. This repo
-intends to provide a full set of batteries-included and self-updating
-infrastructure that can be used for configuring and securing Kubernetes clusters
-according to best practices. Each change is fully tested before it is
-automatically merged into the main branch.
+Foundational infrastructure for EKS and bare-metal (Talos) Kubernetes clusters, delivered by
+Argo CD. One values file per cluster; everything else is shared and pinned.
 
-The configs are split into different components, which can be deployed separately:
+## How it works
 
-- bootstrap: required ArgoCD configs for configuration.
-- system: core system infrastructure to be deployed for the cluster.
-- monitoring: monitoring configuration for the cluster.
-- network: network configuration for the cluster.
-- security: security configuration for the cluster.
+A cluster comes up in three layers, each waiting for the one before it to be Synced and Healthy:
 
-> [!NOTE]
-> These configs all assume deployment with ArgoCD.
+| Layer     | What                                                        | Installed by                      |
+| --------- | ----------------------------------------------------------- | --------------------------------- |
+| bootstrap | Cilium (CNI) and Argo CD                                    | `scripts/bootstrap-cluster`, once |
+| core      | What every cluster needs: DNS, certs, storage, policy, etc. | Argo CD, AppProject `core`        |
+| platform  | What applications use: Kafka, databases, VMs, Kargo, etc.   | Argo CD, AppProject `platform`    |
 
-## Running Locally
+- **`cluster/`** is a Helm chart. `cluster/values.yaml` is the catalog: every project with its chart,
+  pinned version, namespace, layer, providers, and sync wave. The chart turns the catalog plus a
+  cluster's values into Argo CD Applications.
+- **`clusters/<name>.yaml`** holds the only per-cluster settings: provider (`eks` or
+  `baremetal`), API endpoint, domain, `disable` list, and `op://` references for secrets.
+- **`scripts/bootstrap-cluster`** installs Cilium and Argo CD, seeds secrets from 1Password, and applies a single
+  `cluster` root Application. From then on Argo CD manages everything, including itself.
+- **Renovate** keeps the catalog's versions current (after 7 days of stability); CI checks every
+  change before it merges.
 
-### Bootstrap configs with ArgoCD
+The specs in [`root.yass.yaml`](root.yass.yaml) and [`spec/`](spec/) are the contract the code
+is built against; [`docs/design.md`](docs/design.md) explains the decisions behind them.
 
-To bootstrap and deploy the configurations, we first need to install ArgoCD. You
-can do this with a local Kubernetes cluster to test.
+## Layout
 
-```bash
-kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-```
+| Path                      | What                                                                                           |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| `cluster/`                | App-of-apps chart; `values.yaml` is the catalog, `values.schema.json` its shape                |
+| `clusters/`               | One values file per cluster ([`spec/values`](spec/values.yass.yaml))                           |
+| `scripts/`                | Every entry point: `bootstrap`, `test`, `cibuild`, `bootstrap-cluster`, and the tools they use |
+| `policies/`               | Rego for cluster values, render rules, and risky-change checks, with tests                     |
+| `tests/`                  | Chart tests (`tests/chart/`), bats tests, stubs, and fixtures                                  |
+| `root.yass.yaml`, `spec/` | The specs                                                                                      |
+| `archive/`                | The previous layout, kept for reference; not deployed or tested                                |
 
-Grab the admin password and log in.
+## Setup
 
-```bash
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
-kubectl port-forward svc/argocd-server -n argocd 8080:443
-argocd login localhost:8080
-```
-
-Bootstrap the ArgoCD infrastructure project. This needs to exist first for
-the infra charts to be deployed.
-
-```bash
-kubectl apply -f bootstrap/project.yaml
-kubectl get appprojects -A
-```
-
-Deploy the rest of the infrastructure pieces.
+Everything runs through [mise](https://mise.jdx.dev), which installs every other tool at the
+version pinned in `mise.toml` (Helm, kubectl, yq, conftest, prek, talosctl, and the rest). Install
+mise first, then install the tools and git hooks:
 
 ```bash
-kubectl apply -f system
-kubectl apply -f monitoring
-kubectl apply -f network
-kubectl apply -f security
+scripts/bootstrap
 ```
 
-### Testing
+## Bring up a cluster
 
-Install the required bats libraries.
+1. Start from a fresh cluster. On Talos, disable kube-proxy and flannel in the machine config.
+2. Write its values file, starting from a fixture; secrets are `op://` references, never values:
+
+   ```bash
+   cp tests/clusters/baremetal.yaml clusters/<name>.yaml   # or tests/clusters/eks.yaml
+   ```
+
+3. Point kubectl at the cluster, sign in to the [1Password CLI](https://developer.1password.com/docs/cli/)
+   (`op`, installed separately so it works with the 1Password app), and run:
+
+   ```bash
+   scripts/bootstrap-cluster clusters/<name>.yaml
+   ```
+
+   It validates the values, installs Cilium and Argo CD, seeds secrets, hands over to Argo CD,
+   then waits up to 30 minutes per layer and names any Application that isn't healthy
+   (`--no-wait` returns after handover). It's safe to re-run.
+
+**Talos installing Cilium itself:** run `scripts/talos-cilium-patch clusters/<name>.yaml`
+and apply the patch to the machine config; bootstrap then skips Cilium and Argo CD adopts it.
+Remove the inline manifest afterwards so `talosctl upgrade-k8s` can't roll back later upgrades.
+
+## Common changes
+
+- **Turn components on or off** per cluster, the same way in every layer: `disable: [name]`
+  removes an optional component, `enable: [name]` adds an opt-in one. On bare metal,
+  `disable: [longhorn]` switches storage to local-path-provisioner.
+- **Pull-through cache (bare metal):** `enable: [zot]` plus `pullThroughCacheIp`, then apply
+  `scripts/talos-registry-patch clusters/<name>.yaml` to the Talos machine config.
+- **Upgrade a project:** Renovate opens the PR; to do it by hand, bump `version` in
+  `cluster/values.yaml`.
+- **Add a project:** add a catalog entry to `cluster/values.yaml` and to the `Catalog` table in
+  `root.yass.yaml`, add any per-project rules to the spec under `spec/`, and update the expected
+  Applications in `tests/chart/layers_test.yaml`.
+
+## Testing
+
+Everything runs through prek:
 
 ```bash
-# Debian
-sudo apt install bats bats-support bats-assert bats-file
-# OSX
-brew install bats-core
-brew tap bats-core/bats-core
-brew install bats-support bats-assert bats-file bats-detik
+prek run --all-files                       # fast: format, lint, specs, Rego, chart, and bats tests
+prek run --all-files --hook-stage manual   # render every fixture, kwok API dry-run (Docker), risk check
 ```
 
-You can run `bats tests` from the root of the repo to run all tests.
-
-```bash
-bats tests
-```
-
-Or you can target individual tests for each component.
-
-```bash
-bats tests/test_system.bats
-```
-
-## TODO
-
-- [ ] More tests for PRs.
-- [ ] Look into how hard it would be to automate/template out new applications.
-- [ ] Bootstrap Argo to be managed with Argo.
+Commits run the fast hooks; CI (`.github/workflows/ci.yaml`, job Lint/Test) runs both.

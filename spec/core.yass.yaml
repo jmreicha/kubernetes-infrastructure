@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://textla.dev/yass/v1.schema.json
+# yaml-language-server: $schema=https://shakefu.github.io/yass/v1.schema.json
 ---
 description: >
   The core layer. Everything a cluster needs to function, be secure, and be observable
@@ -7,75 +7,81 @@ version: v1
 ---
 spec: Core
 INPUT:
-- CONFORMS: ./bootstrap@Bootstrap::RETURN
-- MUST: rely on Argo CD, Cilium, and the seeded Secrets being in place without re-checking them
-- WHEN: any of those guarantees does not hold when the core layer starts
-  MUST: let the affected core Applications fail to sync, and report the failure through Core ERROR
+  - CONFORMS: ./bootstrap@Bootstrap::RETURN
+  - MUST: rely on Argo CD, Cilium, and the seeded Secrets being in place without re-checking them
+  - WHEN: any of those guarantees does not hold when the core layer starts
+    MUST: let the affected core Applications fail to sync, and report the failure through Core ERROR
 RETURN:
-- MUST: complete only when every Application rendered by this layer is Synced and Healthy
-- MUST: guarantee on completion that the cluster has exactly one default StorageClass
-- MUST: guarantee on completion that the CRDs and admission webhooks of every wave 1 Application are established
+  - MUST: complete only when every Application rendered by this layer is Synced and Healthy
+  - MUST: guarantee on completion that the cluster has exactly one default StorageClass
+  - MUST: guarantee on completion that the CRDs and admission webhooks of every wave 1 Application are established
 SIDE-EFFECT:
-- MUST: "render one Application for every catalog entry whose layer is `core` and whose providers include the cluster's provider, in AppProject `core`"
-- WHEN: the cluster values carry no domain
-  MUST: render no external-dns Application
-- MUST: render no Application for any other catalog entry
-- MUST: "install cert-manager with its CRDs (`crds.enabled=true`)"
-- MUST: install Gatekeeper with its controller and audit enabled and no constraints
-- MUST: install Falco with its default ruleset and the modern eBPF driver
-- MUST: install the OpenTelemetry operator with no OpenTelemetryCollector resources
+  - MUST: "render one Application for every catalog entry whose layer is `core` and whose providers include the cluster's provider, in AppProject `core`"
+  - WHEN: the cluster values carry no domain
+    MUST: render no external-dns Application
+  - MUST: render no Application for any other catalog entry
+  - MUST: "install cert-manager with its CRDs (`crds.enabled=true`)"
+  - MUST: install Gatekeeper with its controller and audit enabled and no constraints
+  - MUST: install Falco with its default ruleset and the modern eBPF driver
+  - MUST: install the OpenTelemetry operator with no OpenTelemetryCollector resources
 ERROR:
-- WHEN: any core Application is not Synced and Healthy 30 minutes after the core root Application is applied
-  MUST: fail, naming every Application that is Degraded, OutOfSync, Missing, or Progressing
-- MUST: fail, report the failure, and leave the cluster as it stands
+  - WHEN: any core Application is not Synced and Healthy 30 minutes after the core root Application is applied
+    MUST: fail, naming every Application that is Degraded, OutOfSync, Missing, or Progressing
+  - MUST: fail, report the failure, and leave the cluster as it stands
 INVARIANT:
-- MUST-NOT: install configuration objects such as ClusterIssuers, ClusterSecretStores, Gatekeeper constraints, Karpenter NodePools, or Falco custom rules
+  - MUST-NOT: install configuration objects such as ClusterIssuers, ClusterSecretStores, Karpenter NodePools, or Falco custom rules, other than the security baseline
+    SEE: ./security@Security
 ---
 spec: Core.Eks
 INPUT:
-- CONFORMS: Core::INPUT
-- MUST: rely on EKS Pod Identity associations for Karpenter, the AWS Load Balancer Controller, the EBS CSI driver, and external-dns already existing, created outside the cluster
+  - CONFORMS: Core::INPUT
+  - MAY: rely on an ECR pull-through cache and node registry mirrors configured outside the cluster, in place of zot
+  - MUST: rely on EKS Pod Identity associations for Karpenter, the AWS Load Balancer Controller, the EBS CSI driver, and external-dns already existing, created outside the cluster
 RETURN:
-- CONFORMS: Core::RETURN
+  - CONFORMS: Core::RETURN
 SIDE-EFFECT:
-- CONFORMS: Core::SIDE-EFFECT
-- MUST: install Karpenter with settings.clusterName from clusterName
-- MUST: install the AWS Load Balancer Controller with clusterName, region, and vpcId
-- MUST: "install the EBS CSI driver with a gp3 StorageClass marked default, created through the chart's storageClasses value"
-- WHEN: the cluster values carry a domain
-  MUST: configure external-dns with the aws provider (Route53) and domainFilters set to domain
-- MUST-NOT: set an IRSA role annotation on any ServiceAccount
+  - CONFORMS: Core::SIDE-EFFECT
+  - MUST: install Karpenter with settings.clusterName from clusterName
+  - MUST: install the AWS Load Balancer Controller with clusterName, region, and vpcId
+  - MUST: "install the EBS CSI driver with a gp3 StorageClass marked default, created through the chart's storageClasses value"
+  - WHEN: the cluster values carry a domain
+    MUST: configure external-dns with the aws provider (Route53), domainFilters set to domain, and policy sync so records never go stale
+  - MUST-NOT: set an IRSA role annotation on any ServiceAccount
 ERROR:
-- WHEN: a Pod Identity association is missing and the controller cannot reach AWS
-  MUST: fail through Core ERROR, with the affected Application named as Degraded
-- CONFORMS: Core::ERROR
+  - WHEN: a Pod Identity association is missing and the controller cannot reach AWS
+    MUST: fail through Core ERROR, with the affected Application named as Degraded
+  - CONFORMS: Core::ERROR
 ---
 spec: Core.Baremetal
 INPUT:
-- CONFORMS: Core::INPUT
-- WHEN: longhorn is not disabled
-  MUST: "rely on every node carrying the Talos `iscsi-tools` and `util-linux-tools` system extensions and the Longhorn kubelet extraMounts"
-- WHEN: longhorn is disabled and local-path-provisioner is not
-  MUST: "rely on every node's Talos machine config making `/var/local-path-provisioner` writable to the provisioner"
-- WHEN: longhorn and local-path-provisioner are both disabled
-  MUST: "rely on the StorageClass named by `defaultStorageClass` existing and being provided outside this project"
+  - CONFORMS: Core::INPUT
+  - WHEN: longhorn is not disabled
+    MUST: "rely on every node carrying the Talos `iscsi-tools` and `util-linux-tools` system extensions and the Longhorn kubelet extraMounts"
+  - WHEN: longhorn is disabled and local-path-provisioner is not
+    MUST: "rely on every node's Talos machine config making `/var/local-path-provisioner` writable to the provisioner"
+  - WHEN: longhorn and local-path-provisioner are both disabled
+    MUST: "rely on the StorageClass named by `defaultStorageClass` existing and being provided outside this project"
 RETURN:
-- CONFORMS: Core::RETURN
+  - CONFORMS: Core::RETURN
 SIDE-EFFECT:
-- CONFORMS: Core::SIDE-EFFECT
-- WHEN: longhorn is not disabled
-  MUST: install Longhorn with its StorageClass marked default, and render no local-path-provisioner Application
-- WHEN: longhorn is disabled and local-path-provisioner is not
-  MUST: install local-path-provisioner with its StorageClass marked default
-- WHEN: longhorn and local-path-provisioner are both disabled
-  MUST: install no StorageClass, and mark no StorageClass default
-- WHEN: the cluster values carry a domain
-  MUST: configure external-dns with the cloudflare provider and domainFilters set to domain, reading the API token from the Secret seeded by SecretSeed
-  SEE: ./bootstrap@SecretSeed
-- MUST: "label the falco namespace, and the longhorn-system or local-path-storage namespace when installed, `pod-security.kubernetes.io/enforce=privileged`"
+  - CONFORMS: Core::SIDE-EFFECT
+  - WHEN: longhorn is not disabled
+    MUST: install Longhorn with its StorageClass marked default, and render no local-path-provisioner Application
+  - WHEN: longhorn is disabled and local-path-provisioner is not
+    MUST: install local-path-provisioner with its StorageClass marked default
+  - WHEN: longhorn and local-path-provisioner are both disabled
+    MUST: install no StorageClass, and mark no StorageClass default
+  - WHEN: the cluster values carry a domain
+    MUST: configure external-dns with the cloudflare provider, domainFilters set to domain, and policy sync, reading the API token from the Secret seeded by SecretSeed
+    SEE: ./bootstrap@SecretSeed
+  - WHEN: zot is enabled
+    MUST: "install zot as an on-demand pull-through cache for each registry in `pullThroughCacheRegistries`, stored under the registry's host name on a persistent volume, behind a LoadBalancer Service on `pullThroughCacheIp`"
+  - WHEN: zot is enabled
+    MUST: "provide `scripts/talos-registry-patch`, which renders Talos RegistryMirrorConfig documents pointing each cached registry at zot, with fallback to the upstream registry left on"
+  - MUST: "run metrics-server with `--kubelet-insecure-tls`, because Talos kubelets serve self-signed certificates by default"
 ERROR:
-- WHEN: a node lacks the Talos extensions Longhorn needs
-  MUST: fail through Core ERROR, with longhorn named as Degraded
-- WHEN: "the StorageClass named by `defaultStorageClass` does not exist, or is not the only StorageClass annotated as default, 30 minutes after the core root Application is applied"
-  MUST: fail through Core ERROR, naming the StorageClass
-- CONFORMS: Core::ERROR
+  - WHEN: a node lacks the Talos extensions Longhorn needs
+    MUST: fail through Core ERROR, with longhorn named as Degraded
+  - WHEN: "the StorageClass named by `defaultStorageClass` does not exist, or is not the only StorageClass annotated as default, when bootstrap starts"
+    MUST: fail the bootstrap layer before anything is installed, naming the StorageClass, because it is provided outside this project
+  - CONFORMS: Core::ERROR

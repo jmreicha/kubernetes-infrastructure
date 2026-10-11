@@ -1,0 +1,40 @@
+{{- /* layer=cluster: the layer roots. layer=bootstrap: the cluster root, applied once by bootstrap.sh. */ -}}
+{{- $roots := list -}}
+{{- if eq .Values.layer "cluster" -}}
+{{- $roots = list (dict "name" "root-core" "layer" "core" "wave" "1") -}}
+{{- if not .Values.coreOnly -}}{{- $roots = append $roots (dict "name" "root-platform" "layer" "platform" "wave" "2") -}}{{- end -}}
+{{- else if eq .Values.layer "bootstrap" -}}
+{{- $roots = list (dict "name" "cluster" "layer" "cluster" "wave" "0") -}}
+{{- end -}}
+{{- range $roots }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .name }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ .wave | quote }}
+  labels:
+    layer: {{ .layer }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: core
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  source:
+    repoURL: {{ $.Values.gitRepo }}
+    targetRevision: {{ $.Values.gitRevision }}
+    path: cluster
+    helm:
+      valueFiles:
+        - ../{{ required "clusterValuesFile is required" $.Values.clusterValuesFile }}
+      parameters:
+        - name: layer
+          value: {{ .layer }}
+        - name: clusterValuesFile
+          value: {{ $.Values.clusterValuesFile }}
+  {{- include "apps.syncPolicy" . | nindent 2 }}
+{{- end }}

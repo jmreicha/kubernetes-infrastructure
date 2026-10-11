@@ -1,0 +1,35 @@
+{{- /* AppProjects scoped to each layer's repos and namespaces (spec/security). */ -}}
+{{- if has .Values.layer (list "bootstrap" "cluster") }}
+{{- $ns := include "apps.namespaces" . | fromYaml }}
+{{- $repos := include "apps.repos" . | fromYaml }}
+{{- range $name := list "core" "platform" }}
+{{- $layers := ternary (list "bootstrap" "core") (list "platform") (eq $name "core") }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ $name }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: {{ ternary "Bootstrap and core layers." "Platform layer." (eq $name "core") }}
+  {{- $src := ternary (list $.Values.gitRepo) (list) (eq $name "core") }}
+  {{- range $l := $layers }}{{ $src = concat $src (get $repos $l) }}{{ end }}
+  sourceRepos: {{ if $src }}{{ toJson $src }}{{ else }}[]{{ end }}
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+    {{- range $l := $layers }}{{ range (get $ns $l) }}{{ if ne . "argocd" }}
+    - server: https://kubernetes.default.svc
+      namespace: {{ . }}
+    {{- end }}{{ end }}{{ end }}
+  clusterResourceWhitelist:
+    {{- if eq $name "core" }}
+    - group: "*"
+      kind: "*"
+    {{- else }}
+    {{- toYaml $.Values.platformClusterKinds | nindent 4 }}
+    {{- end }}
+{{- end }}
+{{- end }}

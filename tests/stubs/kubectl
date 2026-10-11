@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Test stub: records calls; behaviour steered by STUB_* env vars.
+echo "kubectl $*" >>"$CALLS"
+case "$*" in
+  *"create secret generic"*) printf 'kind: Secret\nmetadata:\n  name: %s\n' "$4" ;;
+  *"create namespace"*) printf 'kind: Namespace\nmetadata:\n  name: %s\n' "$3" ;;
+  *"apply -f -"*)
+    cat >>"$APPLIED"
+    echo "---" >>"$APPLIED"
+    ;;
+  *"get pods"*"k8s-app=kube-proxy"*) echo "${STUB_KUBE_PROXY_NODES:-}" ;;
+  *"get pods"*"app=flannel"*) echo "" ;;
+  *"get secret argocd-initial-admin-secret"*) printf '%s' "$(printf ADMIN-PW-VALUE | base64)" ;;
+  *"get secret"*)
+    [[ " ${STUB_EXISTING_SECRETS:-} " == *" ${3:-x} "* ]]
+    exit $?
+    ;;
+  *"get daemonset aws-node"*) exit 1 ;;
+  *"get daemonset cilium"*)
+    [ "${STUB_CILIUM_PRESENT:-}" = 1 ]
+    exit $?
+    ;;
+  *exec*)
+    cat >/dev/null
+    echo "ARGO-TOKEN-VALUE"
+    ;;
+  *"get storageclass"*) echo "${STUB_DEFAULT_SCS:-}" ;;
+  *"wait application/root-"*)
+    [[ "$*" != *"${STUB_UNHEALTHY_ROOT:-none}"* ]]
+    exit $?
+    ;;
+  *"get applications"*) echo "${STUB_UNHEALTHY_APPS:-}" ;;
+esac
+exit 0

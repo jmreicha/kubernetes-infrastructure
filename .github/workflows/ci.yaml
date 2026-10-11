@@ -1,0 +1,63 @@
+---
+# All prek hooks on every PR and push to main: the fast ones, then the manual-stage
+# render, kwok API, and risk tiers (spec/verification).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test:
+    name: Lint/Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the risk check renders origin/main
+          persist-credentials: false
+
+      - name: Install mise tools
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+
+      - name: Run prek
+        uses: j178/prek-action@1382ad72dea72f9d53832f2bcb65b3e87a947204 # v3.0.1
+        with:
+          prek-version: 0.5.5 # keep in step with mise.toml
+          extra-args: --all-files
+
+      - name: Run prek (render, API, and risk tiers)
+        uses: j178/prek-action@1382ad72dea72f9d53832f2bcb65b3e87a947204 # v3.0.1
+        with:
+          prek-version: 0.5.5 # keep in step with mise.toml
+          extra-args: --all-files --hook-stage manual
+
+  automerge:
+    name: Auto approve and merge Renovate PRs
+    needs: lint-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The PR author, not github.actor, which the last event can spoof.
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'renovate[bot]'
+    steps:
+      - name: Auto approve
+        uses: hmarr/auto-approve-action@f0939ea97e9205ef24d872e76833fa908a770363 # v4.0.0
+        with:
+          github-token: ${{ secrets.CI_GITHUB_TOKEN }}
+
+      - name: Auto merge
+        uses: pascalgn/automerge-action@d1203c0bf94a827b991e5de69d662e9163304fa0 # v0.16.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
+          MERGE_LABELS: dependencies
+          MERGE_METHOD: rebase

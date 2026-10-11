@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Risk check (spec/verification Verification.Risk): render the base commit and the working
+# tree for every fixture, report every change, and fail on risky ones.
+# Usage: scripts/verify-risk <base-ref> [out-dir]
+set -euo pipefail
+root=$(cd "$(dirname "$0")/.." && pwd)
+base_ref=$1 out=${2:-$root/.cache/risk}
+rm -rf "$out"
+mkdir -p "$out/base-tree"
+git -C "$root" archive "$base_ref" | tar -x -C "$out/base-tree"
+# Render the base with today's renderer so only cluster/ and fixtures differ.
+mkdir -p "$out/base-tree/tests" "$out/base-tree/scripts"
+cp "$root/tests/tool-versions.env" "$out/base-tree/tests/"
+cp "$root/scripts/render" "$out/base-tree/scripts/"
+
+docs() { # render-dir -> JSON array of docs tagged with renderedBy; generated resources excluded
+  local d=$1
+  [ -d "$d/apps" ] || {
+    echo '[]'
+    return
+  }
+  {
+    cat "$d"/apps/*.yaml | yq -N -o json -I0 'select(.kind != null) | .renderedBy = "apps"'
+    for f in "$d"/charts/*.yaml; do
+      yq -N -o json -I0 "select(.kind != null) | .renderedBy = \"$(basename "$f" .yaml)\"" "$f"
+    done
+  } | jq -s --slurpfile u "$d/unstable.json" '
+    ($u[0] | to_entries | map(.key as $a | .value[] | "\($a)/\(.kind)/\(.name)")) as $skip
+    | map(select(("\(.renderedBy)/\(.kind)/\(.metadata.name)") as $k | $skip | index($k) | not))'
+}
+
+# Base renders share this checkout's chart cache, so unchanged charts aren't downloaded again.
+export CHART_CACHE="$root/.cache/charts"
+for values in "$root"/tests/clusters/*.yaml; do
+  f=$(basename "$values" .yaml)
+  "$root/scripts/render" "$values" "$out/head/$f" >/dev/null 2>&1 || touch "$out/$f.failed" &
+  if [ -f "$out/base-tree/tests/clusters/$f.yaml" ] && [ -d "$out/base-tree/cluster" ]; then
+    "$out/base-tree/scripts/render" "$out/base-tree/tests/clusters/$f.yaml" "$out/base/$f" >/dev/null 2>&1 || touch "$out/$f.failed" &
+  fi
+done
+wait
+
+fail=0
+for values in "$root"/tests/clusters/*.yaml; do
+  f=$(basename "$values" .yaml)
+  echo "== $f" >&2
+  [ ! -e "$out/$f.failed" ] || {
+    echo "render failed for $f" >&2
+    fail=1
+    continue
+  }
+  docs "$out/base/$f" >"$out/$f.base.json"
+  docs "$out/head/$f" >"$out/$f.head.json"
+  jq -n --slurpfile b "$out/$f.base.json" --slurpfile h "$out/$f.head.json" '{base: $b[0], head: $h[0]}' >"$out/$f.json"
+  # Full change report: + added, - removed, ~ changed.
+  jq -r 'def k: "\(.renderedBy) \(.kind)/\(.metadata.namespace // "-")/\(.metadata.name)";
+    (.base | map({(k): .}) | add // {}) as $b | (.head | map({(k): .}) | add // {}) as $h
+    | ($h | keys - ($b | keys) | map("+ " + .)) + ($b | keys - ($h | keys) | map("- " + .))
+      + ([$b | keys[] | select($h[.] and $h[.] != $b[.])] | map("~ " + .)) | .[]' "$out/$f.json" | sort -k2 >&2
+  conftest test --policy "$root/policies" --namespace risk "$out/$f.json" >&2 || fail=1
+done
+exit $fail

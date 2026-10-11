@@ -1,0 +1,126 @@
+# cluster/values.schema.json: catalog entries must have the right shape; cluster values stay with Rego.
+suite: schema
+templates: [templates/applications.yaml]
+tests:
+  - it: a well-formed entry renders
+    values: [../clusters/eks.yaml]
+    set:
+      layer: core
+      catalog:
+        - {
+            name: demo,
+            chart: demo,
+            repoURL: https://charts.example.com,
+            version: 1.0.0,
+            namespace: demo,
+            layer: core,
+            providers: [eks],
+            wave: 2,
+          }
+    asserts:
+      - hasDocuments: { count: 1 }
+  - it: a misspelled key is rejected
+    values: [../clusters/eks.yaml]
+    set:
+      layer: core
+      catalog:
+        - {
+            name: demo,
+            chart: demo,
+            repoURL: https://charts.example.com,
+            version: 1.0.0,
+            namespace: demo,
+            layer: core,
+            providers: [eks],
+            wave: 2,
+            optinal: true,
+          }
+    asserts:
+      - failedTemplate: { errorPattern: "optinal" }
+  - it: a missing version is rejected
+    values: [../clusters/eks.yaml]
+    set:
+      layer: core
+      catalog:
+        - {
+            name: demo,
+            chart: demo,
+            repoURL: https://charts.example.com,
+            namespace: demo,
+            layer: core,
+            providers: [eks],
+            wave: 2,
+          }
+    asserts:
+      - failedTemplate: { errorPattern: "version" }
+  - it: an unknown layer is rejected
+    values: [../clusters/eks.yaml]
+    set:
+      layer: core
+      catalog:
+        - {
+            name: demo,
+            chart: demo,
+            repoURL: https://charts.example.com,
+            version: 1.0.0,
+            namespace: demo,
+            layer: platfrom,
+            providers: [eks],
+            wave: 2,
+          }
+    asserts:
+      - failedTemplate: { errorPattern: "layer" }
+  - it: an unknown provider is rejected
+    values: [../clusters/eks.yaml]
+    set:
+      layer: core
+      catalog:
+        - {
+            name: demo,
+            chart: demo,
+            repoURL: https://charts.example.com,
+            version: 1.0.0,
+            namespace: demo,
+            layer: core,
+            providers: [gke],
+            wave: 2,
+          }
+    asserts:
+      - failedTemplate: { errorPattern: "providers" }
+  - it: chart and path together are rejected
+    values: [../clusters/eks.yaml]
+    set:
+      layer: core
+      catalog:
+        - {
+            name: demo,
+            chart: demo,
+            path: x,
+            repoURL: https://charts.example.com,
+            version: 1.0.0,
+            namespace: demo,
+            layer: core,
+            providers: [eks],
+            wave: 2,
+          }
+    asserts:
+      - failedTemplate: {}
+  - it: optional and optIn together are rejected
+    values: [../clusters/eks.yaml]
+    set:
+      layer: core
+      catalog:
+        - {
+            name: demo,
+            chart: demo,
+            repoURL: https://charts.example.com,
+            version: 1.0.0,
+            namespace: demo,
+            layer: core,
+            providers: [eks],
+            wave: 2,
+            optional: true,
+            optIn: true,
+          }
+    asserts:
+      - failedTemplate: {}

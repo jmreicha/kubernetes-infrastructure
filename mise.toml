@@ -1,0 +1,22 @@
+# Pinned dev and CI tools. Helm matches Argo CD's bundled version.
+
+
+[tools]
+"github:helm-unittest/helm-unittest" = "1.2.1"
+"github:kubernetes-sigs/kwok" = { version = "0.8.0", asset_pattern = 'kwokctl-{{ os(macos="darwin") }}-{{ arch(x64="amd64") }}', bin = "kwokctl" }
+"github:shakefu/yass" = "0.4.3"
+"npm:oxfmt" = "0.72.0"
+bats = "1.14.0"
+conftest = "0.71.1"
+helm = "4.2.1"
+jq = "1.8.2"
+kube-score = "1.20.0"
+kubeconform = "0.8.0"
+kubectl = "1.34.12"
+kustomize = "5.8.1"
+node = "24.21.0"
+pluto = "5.24.4"
+prek = "0.5.5"
+talosctl = "1.14.2"
+regal = "0.43.0"
+yq = "4.54.1"

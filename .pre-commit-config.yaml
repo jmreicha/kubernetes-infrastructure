@@ -1,41 +1,160 @@
 ---
-default_stages: [commit]
-repos:
-  - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.35.1
-    hooks:
-      - id: yamllint
-        args: ['-d {extends: default, rules: {line-length: {max: 120, level: warning}}}']
-        files: \.(yaml|yml)$
-        types: [file, yaml]
+# Hooks run by prek priority: lower first; equal priorities run concurrently.
+# 0-2 fixers (sequential where they touch the same files), 10 read-only checks, 20 tests.
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
+exclude: ^archive/
 
+repos:
+  # --- Fixers ---
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
-      - id: check-merge-conflict
+        name: trim trailing whitespace (pre-commit-hooks)
+        priority: 0
       - id: end-of-file-fixer
+        name: fix end of files (pre-commit-hooks)
+        priority: 1
+      - id: check-merge-conflict
+        name: check for merge conflict markers (pre-commit-hooks)
+        priority: 10
       - id: check-case-conflict
+        name: check for case-conflicting file names (pre-commit-hooks)
+        priority: 10
       - id: check-json
+        name: check json syntax (pre-commit-hooks)
+        priority: 10
+      - id: check-executables-have-shebangs
+        name: check executables have shebangs (pre-commit-hooks)
+        priority: 10
+      - id: check-shebang-scripts-are-executable
+        name: check scripts with shebangs are executable (pre-commit-hooks)
+        priority: 10
+      - id: detect-private-key
+        name: check for private keys (pre-commit-hooks)
+        priority: 10
 
-  - repo: https://github.com/stackrox/kube-linter
-    rev: v0.6.8
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.14.1-1
     hooks:
-      - id: kube-linter-system
+      - id: shfmt
+        name: format shell scripts (shfmt)
+        args: [-w, -i, "2", -ci, -bn]
+        priority: 2
+
+  # Local hooks run tools pinned in mise.toml; each asks mise only for the tools it uses.
+  - repo: local
+    hooks:
+      - id: oxfmt
+        name: format yaml, json, toml, markdown (oxfmt)
+        entry: mise exec node npm:oxfmt -- oxfmt --no-error-on-unmatched-pattern
+        language: system
+        types_or: [yaml, json, json5, toml, markdown]
+        priority: 2
+
+  # --- Read-only checks ---
+  - repo: https://github.com/jdx/jactionlint
+    rev: v2.1.0
+    hooks:
+      - id: jactionlint
+        name: lint gha workflow files (jactionlint)
+        priority: 10
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1-1
+    hooks:
+      - id: shellcheck
+        name: lint shell scripts (shellcheck)
+        # Follow `source` so variables set in shared test helpers are seen.
+        args: [--severity=warning, --external-sources, --source-path=SCRIPTDIR]
+        priority: 10
+
+  - repo: https://github.com/renovatebot/pre-commit-hooks
+    rev: 44.151.0
+    hooks:
+      - id: renovate-config-validator
+        name: validate renovate config (renovate)
+        priority: 10
+
+  - repo: local
+    hooks:
+      - id: cluster-values
+        name: validate cluster values (conftest)
+        entry: mise exec yq conftest -- scripts/check-values
+        language: system
+        files: ^(clusters|tests/clusters)/.*\.yaml$
+        priority: 10
+      - id: regal
+        name: lint rego policies (regal)
+        entry: mise exec regal -- regal lint policies/
+        language: system
+        files: \.rego$
+        pass_filenames: false
+        priority: 10
+      - id: yass
+        name: validate and lint specs (yass)
+        entry: mise exec github:shakefu/yass -- sh -c 'yass validate && yass lint'
+        language: system
+        files: \.yass\.yaml$
+        pass_filenames: false
+        priority: 10
+
+      # --- Tests ---
+      - id: rego-tests
+        name: test rego policies (conftest)
+        entry: mise exec conftest -- conftest verify --policy policies
+        language: system
+        files: ^policies/
+        pass_filenames: false
+        priority: 20
+      - id: chart-tests
+        name: test cluster chart (helm-unittest)
+        entry: mise exec helm github:helm-unittest/helm-unittest -- scripts/chart-tests
+        language: system
+        files: ^(cluster|tests/(chart|clusters))/
+        pass_filenames: false
+        priority: 20
+      - id: bats-tests
+        name: test bootstrap, talos patches, render helpers, renovate, catalog (bats)
+        entry: mise exec -- scripts/bats-tests
+        language: system
+        files: ^(scripts|tests|cluster|policies|\.github/renovate\.json5)
+        pass_filenames: false
+        priority: 20
+
+  # --- Slow tiers (~2 min, Docker): CI runs them; locally `prek run --hook-stage manual --all-files` ---
+  # Sequential: both use the shared chart cache.
+  - repo: local
+    hooks:
+      - id: render-api-tiers
+        name: render fixtures and dry-run against kwok (manual)
+        entry: mise exec -- sh -c 'scripts/verify-render .cache/render && scripts/verify-api .cache/render'
+        language: system
+        stages: [manual]
+        always_run: true
+        pass_filenames: false
+        priority: 30
+      - id: risk-check
+        name: check risky changes against origin/main (manual)
+        entry: mise exec -- scripts/verify-risk origin/main
+        language: system
+        stages: [manual]
+        always_run: true
+        pass_filenames: false
+        priority: 40
+      - id: slow-tests
+        name: test api tier and failure paths (bats, manual)
+        entry: mise exec -- bats tests/slow
+        language: system
+        stages: [manual]
+        always_run: true
+        pass_filenames: false
+        priority: 50
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v3.24.0
+    rev: v4.19.2
     hooks:
       - id: commitizen
+        name: check commit message format (commitizen)
         stages: [commit-msg]
-
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.39.0
-    hooks:
-      - id: markdownlint
-        args: ['--disable', 'MD013', '--', '*.md']
-
-  - repo: https://github.com/rhysd/actionlint
-    rev: v1.6.27
-    hooks:
-      - id: actionlint

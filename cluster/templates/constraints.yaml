@@ -1,0 +1,31 @@
+{{- /* Baseline Gatekeeper Constraints in dryrun (spec/security); templates come from gatekeeper-library. */ -}}
+{{- if eq .Values.layer "core" }}
+{{- $pods := list (dict "apiGroups" (list "") "kinds" (list "Pod")) }}
+{{- $constraints := list
+  (dict "kind" "K8sPSPPrivilegedContainer" "name" "no-privileged-containers" "host" true)
+  (dict "kind" "K8sPSPHostNamespace" "name" "no-host-namespaces" "host" true)
+  (dict "kind" "K8sPSPHostNetworkingPorts" "name" "no-host-network-or-ports" "host" true "parameters" (dict "hostNetwork" false))
+  (dict "kind" "K8sPSPHostFilesystem" "name" "no-host-paths" "host" true "parameters" (dict "allowedHostPaths" (list)))
+  (dict "kind" "K8sDisallowedTags" "name" "no-latest-tags" "parameters" (dict "tags" (list "latest") "exemptImages" (list)))
+  (dict "kind" "K8sContainerRequests" "name" "require-requests" "parameters" (dict "cpu" "32" "memory" "128Gi")) }}
+{{- range $constraints }}
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: {{ .kind }}
+metadata:
+  name: {{ .name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  enforcementAction: dryrun
+  match:
+    kinds: {{ toJson $pods }}
+    {{- if .host }}
+    excludedNamespaces: {{ toJson $.Values.privilegedNamespaces }}
+    {{- end }}
+  {{- with .parameters }}
+  parameters: {{ toJson . }}
+  {{- end }}
+{{- end }}
+{{- end }}

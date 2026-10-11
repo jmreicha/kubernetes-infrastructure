@@ -1,0 +1,50 @@
+{{- $layers := list "bootstrap" "cluster" "core" "platform" -}}
+{{- if not (has .Values.layer $layers) -}}
+{{- fail (printf "layer must be one of %v, got %q" $layers .Values.layer) -}}
+{{- end -}}
+{{- $catalogLayer := ternary "bootstrap" .Values.layer (eq .Values.layer "cluster") -}}
+{{- range .Values.catalog }}
+{{- if and (ne $.Values.layer "bootstrap") (eq .layer $catalogLayer) (eq (include "apps.enabled" (dict "entry" . "root" $)) "true") }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .name }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ .wave | quote }}
+  labels:
+    layer: {{ .layer }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ ternary "platform" "core" (eq .layer "platform") }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .namespace }}
+  source:
+    repoURL: {{ .repoURL | trimPrefix "oci://" }}
+    targetRevision: {{ .version | quote }}
+    {{- if .path }}
+    path: {{ .path }}
+    {{- else }}
+    chart: {{ .chart }}
+    {{- end }}
+    {{- with .values }}
+    helm:
+      valuesObject:
+        {{- tpl . $ | fromYaml | toYaml | nindent 8 }}
+    {{- end }}
+  {{- with .ignoreDifferences }}
+  ignoreDifferences:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- include "apps.syncPolicy" . | nindent 2 }}
+  {{- if .ignoreDifferences }}
+      - RespectIgnoreDifferences=true
+  {{- end }}
+    managedNamespaceMetadata:
+      labels:
+        {{- include "apps.psaLabels" (dict "ns" .namespace "root" $) | nindent 8 }}
+{{- end }}
+{{- end }}

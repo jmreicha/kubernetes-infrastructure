@@ -1,0 +1,39 @@
+{{- /* Default-deny ingress per managed namespace, owned by the lowest layer that deploys into it (spec/security). */ -}}
+{{- $own := dict "cluster" (list "bootstrap") "core" (list "core") "platform" (list "platform") }}
+{{- $lower := dict "cluster" (list) "core" (list "bootstrap") "platform" (list "bootstrap" "core") }}
+{{- if hasKey $own .Values.layer }}
+{{- $ns := include "apps.namespaces" . | fromYaml }}
+{{- $taken := list }}
+{{- range (get $lower .Values.layer) }}{{ $taken = concat $taken (get $ns .) }}{{ end }}
+{{- range $l := (get $own .Values.layer) }}
+{{- range $n := (get $ns $l) }}
+{{- if and (ne $n "kube-system") (not (has $n $taken)) }}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  {{- if eq $n "envoy-gateway-system" }}
+  name: allow-gateway-ingress
+  {{- else }}
+  name: default-deny-ingress
+  {{- end }}
+  namespace: {{ $n }}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  endpointSelector: {}
+  ingress:
+    {{- if eq $n "envoy-gateway-system" }}
+    - fromEntities: [world, cluster]
+    {{- else }}
+    - fromEndpoints: [{}]
+    - fromEndpoints: [{ matchLabels: { k8s:io.kubernetes.pod.namespace: envoy-gateway-system } }]
+    - fromEntities: [kube-apiserver, host, remote-node, health]
+    {{- if eq $n "argocd" }}
+    - fromEndpoints: [{ matchLabels: { k8s:io.kubernetes.pod.namespace: kubechecks } }]
+    {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

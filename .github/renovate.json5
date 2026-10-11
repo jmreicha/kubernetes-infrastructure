@@ -1,0 +1,99 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:base", "helpers:pinGitHubActionDigests", ":disableDependencyDashboard"],
+  // Catalog pins in cluster/values.yaml (root.yass.yaml GitOpsConventions).
+  customManagers: [
+    {
+      customType: "regex",
+      description: "Helm charts from https repositories",
+      managerFilePatterns: ["/^cluster/values\\.yaml$/"],
+      matchStrings: [
+        "chart: (?<depName>\\S+)\\n\\s+repoURL: (?<registryUrl>https://\\S+)\\n\\s+version: (?<currentValue>\\S+)",
+      ],
+      datasourceTemplate: "helm",
+    },
+    {
+      customType: "regex",
+      description: "Helm charts from OCI registries",
+      managerFilePatterns: ["/^cluster/values\\.yaml$/"],
+      matchStrings: [
+        "chart: (?<depName>\\S+)\\n\\s+repoURL: oci://(?<packageName>\\S+)\\n\\s+version: (?<currentValue>\\S+)",
+      ],
+      datasourceTemplate: "docker",
+      packageNameTemplate: "{{{packageName}}}/{{{depName}}}",
+    },
+    {
+      customType: "regex",
+      description: "Charts sourced from git at a release tag",
+      managerFilePatterns: ["/^cluster/values\\.yaml$/"],
+      matchStrings: [
+        "name: (?<depName>\\S+)\\n\\s+path: \\S+\\n\\s+repoURL: (?<packageName>https://\\S+)\\n\\s+version: (?<currentValue>v?\\d+\\.\\S*)\\n",
+      ],
+      datasourceTemplate: "git-tags",
+    },
+    {
+      customType: "regex",
+      description: "Charts sourced from git at a commit, where upstream publishes no releases",
+      managerFilePatterns: ["/^cluster/values\\.yaml$/"],
+      matchStrings: [
+        "name: (?<depName>\\S+)\\n\\s+path: \\S+\\n\\s+repoURL: (?<packageName>https://\\S+)\\n\\s+version: (?<currentDigest>[0-9a-f]{40})\\n",
+      ],
+      datasourceTemplate: "git-refs",
+      currentValueTemplate: "master",
+    },
+    {
+      customType: "regex",
+      description: "Image tags pinned in catalog values where a chart defaults to latest",
+      managerFilePatterns: ["/^cluster/values\\.yaml$/"],
+      matchStrings: [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\s+tag: (?<currentValue>\\S+)",
+      ],
+    },
+    {
+      customType: "regex",
+      description: "prek version in CI, kept in step with mise.toml",
+      managerFilePatterns: ["/^\\.github/workflows/ci\\.yaml$/"],
+      matchStrings: ["prek-version: (?<currentValue>\\S+)"],
+      datasourceTemplate: "github-releases",
+      depNameTemplate: "j178/prek",
+      packageNameTemplate: "j178/prek",
+      extractVersionTemplate: "^v?(?<version>.*)$",
+    },
+    {
+      customType: "regex",
+      description: "CRD schema catalog tag for the render tier",
+      managerFilePatterns: ["/^tests/tool-versions\\.env$/"],
+      matchStrings: ["CRD_CATALOG_REF=(?<currentValue>\\S+)"],
+      datasourceTemplate: "github-tags",
+      depNameTemplate: "CustomResourceDefinition/catalog",
+      packageNameTemplate: "CustomResourceDefinition/catalog",
+    },
+  ],
+  labels: ["dependencies"],
+  minimumReleaseAge: "7 days",
+  packageRules: [
+    {
+      // mise.toml and ci.yaml pin prek separately; bump them in one PR.
+      groupName: "prek",
+      matchPackageNames: ["prek", "j178/prek"],
+    },
+    {
+      automerge: true,
+      automergeSchedule: ["before 3:00am"],
+      automergeType: "branch",
+      groupName: "auto-update",
+      ignoreTests: true,
+      managers: ["pre-commit"],
+      matchUpdateTypes: ["minor", "patch", "pin", "digest"],
+    },
+  ],
+  "pre-commit": {
+    enabled: true,
+  },
+  prConcurrentLimit: 5,
+  recreateClosed: true,
+  schedule: ["before 3:00am"],
+  vulnerabilityAlerts: {
+    labels: ["security"],
+  },
+}

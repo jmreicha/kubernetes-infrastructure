@@ -1,0 +1,22 @@
+# Style rules relaxed for readability; correctness and bug rules stay on.
+rules:
+  imports:
+    unresolved-reference:
+      except-paths:
+        - data.catalog # cluster/values.yaml catalog, passed with conftest --data
+  style:
+    line-length:
+      max-line-length: 140
+      ignore:
+        files: ["*_test.rego"] # fixtures read best on one line
+    messy-rule:
+      level: ignore
+  idiomatic:
+    directory-package-mismatch:
+      level: ignore # policies/ is flat by choice; packages are values, render, risk
+    prefer-string-interpolation:
+      level: ignore
+    no-defined-entrypoint:
+      level: ignore
+    use-some-for-output-vars:
+      level: ignore
