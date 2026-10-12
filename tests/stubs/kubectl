@@ -3,6 +3,10 @@
 echo "kubectl $*" >>"$CALLS"
 case "$*" in
   *"create secret generic"*) printf 'kind: Secret\nmetadata:\n  name: %s\n' "$4" ;;
+  *"get daemonset cilium"*)
+    [ "${STUB_CILIUM_PRESENT:-}" = 1 ]
+    exit $?
+    ;;
   *"create namespace"*) printf 'kind: Namespace\nmetadata:\n  name: %s\n' "$3" ;;
   *"apply -f -"*)
     cat >>"$APPLIED"
@@ -16,10 +20,6 @@ case "$*" in
     exit $?
     ;;
   *"get daemonset aws-node"*) exit 1 ;;
-  *"get daemonset cilium"*)
-    [ "${STUB_CILIUM_PRESENT:-}" = 1 ]
-    exit $?
-    ;;
   *exec*)
     cat >/dev/null
     echo "ARGO-TOKEN-VALUE"

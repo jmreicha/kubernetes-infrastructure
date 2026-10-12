@@ -159,7 +159,7 @@ tests:
     values: [../clusters/eks.yaml]
     set: { layer: cluster, clusterValuesFile: clusters/eks.yaml }
     template: templates/network-policies.yaml
-    documentSelector: { path: metadata.namespace, value: argocd }
+    documentSelector: { path: metadata.name, value: default-deny-ingress }
     asserts:
       - contains:
           path: spec.ingress
@@ -209,3 +209,17 @@ tests:
     asserts:
       - hasDocuments: { count: 6 }
       - equal: { path: spec.enforcementAction, value: dryrun }
+  - it: doks gets no network policies, which would enforce immediately there
+    values: [../clusters/doks.yaml]
+    set: { layer: core }
+    template: templates/network-policies.yaml
+    asserts:
+      - hasDocuments: { count: 0 }
+  - it: the principal accepts agents from other clusters
+    values: [../clusters/eks.yaml]
+    set: { layer: cluster, clusterValuesFile: clusters/eks.yaml }
+    template: templates/network-policies.yaml
+    documentSelector: { path: metadata.name, value: allow-agent-principal }
+    asserts:
+      - equal: { path: metadata.namespace, value: argocd }
+      - equal: { path: spec.ingress, value: [{ fromEntities: [world, cluster] }] }

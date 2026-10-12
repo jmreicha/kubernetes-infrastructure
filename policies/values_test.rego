@@ -133,3 +133,51 @@ test_zot_on_eks_denied if {
 	some m in values.deny with data.catalog as optin_catalog with input as object.union(base_eks, {"enable": ["zot"], "pullThroughCacheIp": "10.0.0.5"})
 	contains(m, "ECR")
 }
+
+base_doks := object.union(object.remove(base_eks, ["region", "vpcId", "apiServerHost", "apiServerPort"]), {"provider": "doks"})
+
+agent_catalog := array.concat(catalog, [
+	{"name": "argocd-agent", "layer": "core", "optIn": true, "providers": ["eks", "baremetal", "doks"]},
+	{"name": "argocd-agent-principal", "layer": "core", "optIn": true, "providers": ["eks", "baremetal", "doks"]},
+])
+
+agent_refs := {
+	"argocdAgentCa": "op://v/agent/ca", "argocdAgentCert": "op://v/agent/cert",
+	"argocdAgentKey": "op://v/agent/key",
+}
+
+test_valid_doks_passes if count(values.deny) == 0 with data.catalog as catalog with input as base_doks
+
+test_eks_still_requires_api_server if {
+	values.deny["missing required key: apiServerHost"] with data.catalog as catalog with input as object.remove(base_eks, ["apiServerHost"])
+}
+
+test_doks_domain_requires_digitalocean_token if {
+	values.deny["missing required key: secretRefs.digitaloceanToken"] with data.catalog as catalog with input as object.union(base_doks, {"domain": "do.example.com", "disable": ["kubechecks"]})
+}
+
+test_agent_requires_principal_and_refs if {
+	inp := object.union(base_eks, {"enable": ["argocd-agent"]})
+	values.deny["missing required key: argocdAgent"] with data.catalog as agent_catalog with input as inp
+	values.deny["missing required key: secretRefs.argocdAgentCert"] with data.catalog as agent_catalog with input as inp
+}
+
+test_agent_with_principal_and_refs_passes if {
+	inp := object.union(base_eks, {
+		"enable": ["argocd-agent"],
+		"argocdAgent": {"principalAddress": "agent.hub.example.com", "principalPort": 443},
+		"secretRefs": object.union(base_eks.secretRefs, agent_refs),
+	})
+	count(values.deny) == 0 with data.catalog as agent_catalog with input as inp
+}
+
+test_principal_requires_jwt_key if {
+	inp := object.union(base_eks, {"enable": ["argocd-agent-principal"], "secretRefs": object.union(base_eks.secretRefs, agent_refs)})
+	values.deny["missing required key: secretRefs.argocdAgentJwtKey"] with data.catalog as agent_catalog with input as inp
+}
+
+test_agent_settings_without_agent_denied if {
+	inp := object.union(base_eks, {"argocdAgent": {"principalAddress": "x", "principalPort": 443}})
+	some m in values.deny with data.catalog as agent_catalog with input as inp
+	contains(m, "argocdAgent")
+}

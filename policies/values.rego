@@ -2,17 +2,18 @@
 # Catalog names come from data.catalog (cluster/values.yaml).
 package values
 
-allowed_providers := {"eks", "baremetal"}
+allowed_providers := {"eks", "baremetal", "doks"}
 
 secret_keys := {
 	"onepasswordCredentials", "onepasswordToken", "kargoAdminPasswordHash",
-	"kargoTokenSigningKey", "cloudflareApiToken", "githubToken",
+	"kargoTokenSigningKey", "cloudflareApiToken", "githubToken", "digitaloceanToken",
+	"argocdAgentCa", "argocdAgentCert", "argocdAgentKey", "argocdAgentJwtKey",
 }
 
 allowed_keys := {
 	"clusterName", "provider", "kubernetesVersion", "apiServerHost", "apiServerPort",
 	"domain", "region", "vpcId", "lbIpPool", "coreOnly", "disable", "enable", "defaultStorageClass", "secretRefs",
-	"pullThroughCacheIp",
+	"pullThroughCacheIp", "argocdAgent",
 }
 
 types := {
@@ -20,7 +21,7 @@ types := {
 	"apiServerHost": "string", "apiServerPort": "number", "domain": "string",
 	"region": "string", "vpcId": "string", "lbIpPool": "array", "coreOnly": "boolean",
 	"disable": "array", "enable": "array", "defaultStorageClass": "string", "secretRefs": "object",
-	"pullThroughCacheIp": "string",
+	"pullThroughCacheIp": "string", "argocdAgent": "object",
 }
 
 disabled := {d | some d in object.get(input, "disable", [])}
@@ -42,7 +43,15 @@ enableable contains e.name if {
 
 enabled_opt_ins := {e | some e in object.get(input, "enable", [])}
 
-required contains k if some k in {"clusterName", "provider", "kubernetesVersion", "apiServerHost", "apiServerPort"}
+required contains k if some k in {"clusterName", "provider", "kubernetesVersion"}
+
+# Only Cilium uses the API server address, and DOKS manages its own Cilium.
+required contains k if {
+	input.provider in {"eks", "baremetal"}
+	some k in {"apiServerHost", "apiServerPort"}
+}
+
+required contains "argocdAgent" if "argocd-agent" in enabled_opt_ins
 
 required contains "region" if input.provider == "eks"
 
@@ -68,6 +77,19 @@ required_refs contains "cloudflareApiToken" if {
 	has_domain
 	input.provider == "baremetal"
 }
+
+required_refs contains "digitaloceanToken" if {
+	has_domain
+	input.provider == "doks"
+}
+
+required_refs contains k if {
+	some role in {"argocd-agent", "argocd-agent-principal"}
+	role in enabled_opt_ins
+	some k in {"argocdAgentCa", "argocdAgentCert", "argocdAgentKey"}
+}
+
+required_refs contains "argocdAgentJwtKey" if "argocd-agent-principal" in enabled_opt_ins
 
 required_refs contains "githubToken" if {
 	has_domain
@@ -133,4 +155,20 @@ deny contains "pullThroughCacheIp is only allowed when zot is enabled" if {
 deny contains "zot runs on baremetal only; on eks, use an ECR pull-through cache configured outside the cluster" if {
 	"zot" in enabled_opt_ins
 	input.provider == "eks"
+}
+
+deny contains "argocdAgent is only allowed when argocd-agent is enabled" if {
+	input.argocdAgent
+	not "argocd-agent" in enabled_opt_ins
+}
+
+deny contains "argocdAgent needs principalAddress (string) and principalPort (number)" if {
+	"argocd-agent" in enabled_opt_ins
+	a := object.get(input, "argocdAgent", {})
+	not valid_agent(a)
+}
+
+valid_agent(a) if {
+	is_string(a.principalAddress)
+	is_number(a.principalPort)
 }

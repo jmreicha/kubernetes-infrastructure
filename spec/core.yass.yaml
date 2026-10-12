@@ -74,6 +74,10 @@ SIDE-EFFECT:
   - WHEN: the cluster values carry a domain
     MUST: configure external-dns with the cloudflare provider, domainFilters set to domain, and policy sync, reading the API token from the Secret seeded by SecretSeed
     SEE: ./bootstrap@SecretSeed
+  - WHEN: argocd-agent is enabled
+    MUST: "install the Argo CD agent in autonomous mode, so this cluster's Argo CD keeps managing its own Applications and the principal at `argocdAgent.principalAddress` gets central visibility, authenticating with mutual TLS"
+  - WHEN: argocd-agent-principal is enabled
+    MUST: "install the Argo CD agent principal behind a LoadBalancer Service, with server certificates and the JWT key from the Secrets seeded by SecretSeed and no generated certificates"
   - WHEN: zot is enabled
     MUST: "install zot as an on-demand pull-through cache for each registry in `pullThroughCacheRegistries`, stored under the registry's host name on a persistent volume, behind a LoadBalancer Service on `pullThroughCacheIp`"
   - WHEN: zot is enabled
@@ -84,4 +88,23 @@ ERROR:
     MUST: fail through Core ERROR, with longhorn named as Degraded
   - WHEN: "the StorageClass named by `defaultStorageClass` does not exist, or is not the only StorageClass annotated as default, when bootstrap starts"
     MUST: fail the bootstrap layer before anything is installed, naming the StorageClass, because it is provided outside this project
+  - CONFORMS: Core::ERROR
+---
+spec: Core.Doks
+INPUT:
+  - CONFORMS: Core::INPUT
+  - MUST: "rely on DigitalOcean providing and managing Cilium, CoreDNS, the DigitalOcean Block Storage CSI driver with its default `do-block-storage` StorageClass, load balancers through the cloud controller manager, node autoscaling, and, from Kubernetes 1.33, the Gateway API CRDs and implementation"
+RETURN:
+  - CONFORMS: Core::RETURN
+SIDE-EFFECT:
+  - CONFORMS: Core::SIDE-EFFECT
+  - MUST-NOT: install Cilium, a CSI driver, a StorageClass, a load balancer controller, Karpenter, Longhorn, or Envoy Gateway, because DigitalOcean provides each
+  - MUST: install metrics-server, which DigitalOcean offers only as an optional add-on
+  - WHEN: the cluster values carry a domain
+    MUST: configure external-dns with the digitalocean provider, domainFilters set to domain, and policy sync, reading the API token from the Secret seeded by SecretSeed
+    SEE: ./bootstrap@SecretSeed
+  - MUST: "label the falco namespace `pod-security.kubernetes.io/enforce=privileged`"
+ERROR:
+  - WHEN: "`do-block-storage` is not the only default StorageClass when bootstrap starts"
+    MUST: fail the bootstrap layer before anything is installed, naming the default StorageClasses found
   - CONFORMS: Core::ERROR

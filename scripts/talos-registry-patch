@@ -5,7 +5,7 @@
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 values=${1:?usage: scripts/talos-registry-patch clusters/<name>.yaml}
-[ "$(yq '(.enable // []) | contains(["zot"])' "$values")" = true ] || {
+[ "$(yq '(.enable // []) | any_c(. == "zot")' "$values")" = true ] || {
   echo "talos-registry-patch: the cluster values must set enable: [zot] and pullThroughCacheIp" >&2
   exit 1
 }

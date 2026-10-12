@@ -29,6 +29,14 @@ for layer in cluster core platform; do
   helm template cluster "$root/cluster" -f "$values" --set layer="$layer" --set clusterValuesFile="$rel" >"$out/apps/$layer.yaml"
 done
 
+# Move a fully fetched temp dir into the cache. rename(2) is atomic and fails if another
+# render got there first, in which case its copy is kept and ours is discarded.
+settle() {
+  perl -e 'rename $ARGV[0], $ARGV[1]' "$1" "$2" 2>/dev/null || true
+  rm -rf "$1"
+  [ -d "$2" ]
+}
+
 # One render per catalog Application, in parallel (roots point back at this repo and are skipped).
 render_app() { # one Application JSON -> charts/<name>.yaml, .unstable.json
   local app=$1 name ns url ver chart path src dir args pull key
@@ -40,9 +48,13 @@ render_app() { # one Application JSON -> charts/<name>.yaml, .unstable.json
   path=$(jq -r '.spec.source.path // ""' <<<"$app")
   jq '.spec.source.helm.valuesObject // {}' <<<"$app" >"$out/charts/$name.values.json"
   if [ -n "$path" ]; then
-    src="$root/.cache/git/$name-$ver"
+    src="${GIT_CACHE:-$root/.cache/git}/$name-$ver"
     if [ ! -d "$src" ]; then # a tag or a commit, fetched shallowly either way
-      git init -q "$src" && git -C "$src" fetch -q --depth 1 "$url" "$ver" && git -C "$src" -c advice.detachedHead=false checkout -q FETCH_HEAD
+      mkdir -p "$(dirname "$src")"
+      tmp=$(mktemp -d "$src.XXXXXX")
+      git init -q "$tmp" && git -C "$tmp" fetch -q --depth 1 "$url" "$ver" \
+        && git -C "$tmp" -c advice.detachedHead=false checkout -q FETCH_HEAD
+      settle "$tmp" "$src"
     fi
     args=(template "$name" "$src/$path" --namespace "$ns" --include-crds --skip-tests --kube-version "$k8s" -f "$out/charts/$name.values.json")
     # Argo CD builds a git path with Kustomize when it has no Chart.yaml.
@@ -52,11 +64,15 @@ render_app() { # one Application JSON -> charts/<name>.yaml, .unstable.json
     dir="${CHART_CACHE:-$root/.cache/charts}/${url//[^A-Za-z0-9.-]/_}/$chart-$ver"
     if [ ! -f "$dir/$chart/Chart.yaml" ]; then
       if [[ $url == http* ]]; then pull=("$chart" --repo "$url"); else pull=("oci://$url/$chart"); fi
-      helm pull "${pull[@]}" --version "$ver" --untar --untardir "$dir" >/dev/null 2>"$out/charts/$name.err" || {
+      mkdir -p "$(dirname "$dir")"
+      tmp=$(mktemp -d "$dir.XXXXXX")
+      helm pull "${pull[@]}" --version "$ver" --untar --untardir "$tmp" >/dev/null 2>"$out/charts/$name.err" || {
+        rm -rf "$tmp"
         echo "render failed: cannot pull $name $url $chart $ver" >&2
         cat "$out/charts/$name.err" >&2
         return 1
       }
+      settle "$tmp" "$dir"
     fi
     args=(template "$name" "$dir/$chart" --namespace "$ns" --include-crds --skip-tests --kube-version "$k8s" -f "$out/charts/$name.values.json")
   fi
@@ -85,8 +101,8 @@ render_app() { # one Application JSON -> charts/<name>.yaml, .unstable.json
   rm "$out/charts/$name.yaml.2"
 }
 
-export -f render_app
-export root out k8s CHART_CACHE="${CHART_CACHE:-$root/.cache/charts}"
+export -f render_app settle
+export root out k8s CHART_CACHE="${CHART_CACHE:-$root/.cache/charts}" GIT_CACHE="${GIT_CACHE:-$root/.cache/git}"
 jobs=${RENDER_JOBS:-8}
 cat "$out"/apps/*.yaml | yq -N -o json -I0 'select(.kind == "Application" and (.spec.source.repoURL | test("kubernetes-infrastructure") | not))' >"$out/apps.jsonl"
 while read -r app; do

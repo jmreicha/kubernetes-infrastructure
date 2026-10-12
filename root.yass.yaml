@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://shakefu.github.io/yass/v1.schema.json
 ---
 description: >
-  Cluster foundation. Given a fresh Kubernetes cluster, a provider (eks or baremetal), and
+  Cluster foundation. Given a fresh Kubernetes cluster, a provider (eks, baremetal, or doks), and
   per-cluster values, this project brings the cluster to a known state through Argo CD.
   It does so in three layers: bootstrap (Cilium and Argo CD, installed imperatively), core
   (what the cluster needs to work and be secure and observable), and platform
@@ -14,7 +14,7 @@ related:
 ---
 spec: ClusterFoundation
 INPUT:
-  - MUST: "accept a provider, which is exactly one of `eks` or `baremetal`"
+  - MUST: "accept a provider, which is exactly one of `eks`, `baremetal`, or `doks`"
   - MUST: "accept a cluster values file at `clusters/<cluster-name>.yaml`"
     CONFORMS: spec/values@ClusterValues
   - MUST: accept a fresh cluster with no CNI installed and nothing yet installed by this project
@@ -24,6 +24,9 @@ INPUT:
   - WHEN: the provider is baremetal
     MUST: install the baremetal variant of each layer
     SEE: spec/core@Core.Baremetal
+  - WHEN: the provider is doks
+    MUST: install the doks variant of each layer
+    SEE: spec/core@Core.Doks
 RETURN:
   - MUST: run the bootstrap layer, then the core layer, then the platform layer, each only after the previous layer has completed, with the ordering enforced by the cluster root Application's sync waves
     SEE: spec/bootstrap@Bootstrap
@@ -35,7 +38,7 @@ RETURN:
   - WHEN: coreOnly is true in the cluster values
     MUST: stop after the core layer, reporting success on the core layer alone
 ERROR:
-  - WHEN: the provider is missing, or is any value other than `eks` or `baremetal`
+  - WHEN: the provider is missing, or is any value other than `eks`, `baremetal`, or `doks`
     MUST: fail before any change is made to the cluster, and name the accepted values
   - WHEN: the cluster values file is missing or fails ClusterValues validation
     MUST: fail before any change is made to the cluster, and name each invalid or missing key
@@ -126,47 +129,49 @@ content: |
 design: Catalog
 type: table
 content: |
-  project                   chart                       repoURL                                                     namespace             layer     providers        wave
-  cilium                    cilium                      https://helm.cilium.io                                      kube-system           bootstrap eks,baremetal    0
-  argo-cd                   argo-cd                     https://argoproj.github.io/argo-helm                        argocd                bootstrap eks,baremetal    0
-  cert-manager              cert-manager                https://charts.jetstack.io                                  cert-manager          core      eks,baremetal    1
-  gatekeeper                gatekeeper                  https://open-policy-agent.github.io/gatekeeper/charts       gatekeeper-system     core      eks,baremetal    1
-  gatekeeper-templates-psp     library/pod-security-policy  https://github.com/open-policy-agent/gatekeeper-library (git) gatekeeper-system core eks,baremetal 2
-  gatekeeper-templates-general library/general              https://github.com/open-policy-agent/gatekeeper-library (git) gatekeeper-system core eks,baremetal 2
-  external-secrets          external-secrets            https://charts.external-secrets.io                          external-secrets      core      eks,baremetal    1
-  onepassword-connect       connect                     https://1password.github.io/connect-helm-charts             onepassword           core      eks,baremetal    1
-  karpenter                 karpenter                   oci://public.ecr.aws/karpenter                              kube-system           core      eks              1
-  aws-ebs-csi-driver        aws-ebs-csi-driver          https://kubernetes-sigs.github.io/aws-ebs-csi-driver        kube-system           core      eks              1
-  longhorn                  longhorn                    https://charts.longhorn.io                                  longhorn-system       core      baremetal        1
-  local-path-provisioner    deploy/chart/local-path-provisioner https://github.com/rancher/local-path-provisioner (git) local-path-storage  core      baremetal        1
-  zot                       zot                         https://zotregistry.dev/helm-charts                        zot                   core      baremetal        2
-  envoy-gateway             gateway-helm                oci://docker.io/envoyproxy                                  envoy-gateway-system  core      eks,baremetal    1
-  external-dns              external-dns                https://kubernetes-sigs.github.io/external-dns              external-dns          core      eks,baremetal    2
-  aws-load-balancer-controller aws-load-balancer-controller https://aws.github.io/eks-charts                           kube-system           core      eks              2
-  falco                     falco                       https://falcosecurity.github.io/charts                      falco                 core      eks,baremetal    2
-  metrics-server            metrics-server              https://kubernetes-sigs.github.io/metrics-server            kube-system           core      eks,baremetal    2
-  kube-state-metrics        kube-state-metrics          https://prometheus-community.github.io/helm-charts          kube-system           core      eks,baremetal    2
-  opentelemetry-operator    opentelemetry-operator      https://open-telemetry.github.io/opentelemetry-helm-charts  opentelemetry         core      eks,baremetal    2
-  kor                       kor                         https://yonahd.github.io/kor                                kor                   core      eks,baremetal    2
-  strimzi                   strimzi-kafka-operator      https://strimzi.io/charts                                   strimzi               platform  eks,baremetal    3
-  openeverest               openeverest                 https://openeverest.github.io/helm-charts                   everest-system        platform  eks,baremetal    3
-  kubevirt                  kubevirt                    oci://ghcr.io/naval-group/kubevirt-stack-charts             kubevirt              platform  baremetal        3
-  cdi                       cdi                         oci://ghcr.io/naval-group/kubevirt-stack-charts             cdi                   platform  baremetal        4
-  crossplane                crossplane                  https://charts.crossplane.io/stable                         crossplane-system     platform  eks,baremetal    4
-  keda                      keda                        https://kedacore.github.io/charts                           keda                  platform  eks,baremetal    4
-  reloader                  reloader                    https://stakater.github.io/stakater-charts                  reloader              platform  eks,baremetal    4
-  argocd-image-updater      argocd-image-updater        https://argoproj.github.io/argo-helm                        argocd                platform  eks,baremetal    4
-  k6-operator               k6-operator                 https://grafana.github.io/helm-charts                       k6-operator-system    platform  eks,baremetal    4
-  atlas-operator            atlas-operator              oci://ghcr.io/ariga/charts                                  atlas-operator        platform  eks,baremetal    4
-  kargo                     kargo                       oci://ghcr.io/akuity/kargo-charts                           kargo                 platform  eks,baremetal    4
-  kubechecks                kubechecks                  https://zapier.github.io/kubechecks                         kubechecks            platform  eks,baremetal    4
+  project                       chart                                repoURL                                                      namespace             layer      providers           wave
+  argo-cd                       argo-cd                              https://argoproj.github.io/argo-helm                         argocd                bootstrap  eks,baremetal,doks  0
+  argocd-agent                  argocd-agent-agent                   oci://ghcr.io/argoproj-labs/argocd-agent                     argocd                core       eks,baremetal,doks  2
+  argocd-agent-principal        argocd-agent-principal               oci://ghcr.io/argoproj-labs/argocd-agent                     argocd                core       eks,baremetal,doks  2
+  argocd-image-updater          argocd-image-updater                 https://argoproj.github.io/argo-helm                         argocd                platform   eks,baremetal,doks  4
+  atlas-operator                atlas-operator                       oci://ghcr.io/ariga/charts                                   atlas-operator        platform   eks,baremetal,doks  4
+  aws-ebs-csi-driver            aws-ebs-csi-driver                   https://kubernetes-sigs.github.io/aws-ebs-csi-driver         kube-system           core       eks                 1
+  aws-load-balancer-controller  aws-load-balancer-controller         https://aws.github.io/eks-charts                             kube-system           core       eks                 2
+  cdi                           cdi                                  oci://ghcr.io/naval-group/kubevirt-stack-charts              cdi                   platform   baremetal           4
+  cert-manager                  cert-manager                         https://charts.jetstack.io                                   cert-manager          core       eks,baremetal,doks  1
+  cilium                        cilium                               https://helm.cilium.io                                       kube-system           bootstrap  eks,baremetal       0
+  crossplane                    crossplane                           https://charts.crossplane.io/stable                          crossplane-system     platform   eks,baremetal,doks  4
+  envoy-gateway                 gateway-helm                         oci://registry-1.docker.io/envoyproxy                        envoy-gateway-system  core       eks,baremetal       1
+  external-dns                  external-dns                         https://kubernetes-sigs.github.io/external-dns               external-dns          core       eks,baremetal,doks  2
+  external-secrets              external-secrets                     https://charts.external-secrets.io                           external-secrets      core       eks,baremetal,doks  1
+  falco                         falco                                https://falcosecurity.github.io/charts                       falco                 core       eks,baremetal,doks  2
+  gatekeeper                    gatekeeper                           https://open-policy-agent.github.io/gatekeeper/charts        gatekeeper-system     core       eks,baremetal,doks  1
+  gatekeeper-templates-general  library/general                      https://github.com/open-policy-agent/gatekeeper-library.git  gatekeeper-system     core       eks,baremetal,doks  2
+  gatekeeper-templates-psp      library/pod-security-policy          https://github.com/open-policy-agent/gatekeeper-library.git  gatekeeper-system     core       eks,baremetal,doks  2
+  k6-operator                   k6-operator                          https://grafana.github.io/helm-charts                        k6-operator-system    platform   eks,baremetal,doks  4
+  kargo                         kargo                                oci://ghcr.io/akuity/kargo-charts                            kargo                 platform   eks,baremetal,doks  4
+  karpenter                     karpenter                            oci://public.ecr.aws/karpenter                               kube-system           core       eks                 1
+  keda                          keda                                 https://kedacore.github.io/charts                            keda                  platform   eks,baremetal,doks  4
+  kor                           kor                                  https://yonahd.github.io/kor                                 kor                   core       eks,baremetal,doks  2
+  kube-state-metrics            kube-state-metrics                   https://prometheus-community.github.io/helm-charts           kube-system           core       eks,baremetal,doks  2
+  kubechecks                    kubechecks                           https://zapier.github.io/kubechecks                          kubechecks            platform   eks,baremetal,doks  4
+  kubevirt                      kubevirt                             oci://ghcr.io/naval-group/kubevirt-stack-charts              kubevirt              platform   baremetal           3
+  local-path-provisioner        deploy/chart/local-path-provisioner  https://github.com/rancher/local-path-provisioner.git        local-path-storage    core       baremetal           1
+  longhorn                      longhorn                             https://charts.longhorn.io                                   longhorn-system       core       baremetal           1
+  metrics-server                metrics-server                       https://kubernetes-sigs.github.io/metrics-server             kube-system           core       eks,baremetal,doks  2
+  onepassword-connect           connect                              https://1password.github.io/connect-helm-charts              onepassword           core       eks,baremetal,doks  1
+  openeverest                   openeverest                          https://openeverest.github.io/helm-charts                    everest-system        platform   eks,baremetal,doks  3
+  opentelemetry-operator        opentelemetry-operator               https://open-telemetry.github.io/opentelemetry-helm-charts   opentelemetry         core       eks,baremetal,doks  2
+  reloader                      reloader                             https://stakater.github.io/stakater-charts                   reloader              platform   eks,baremetal,doks  4
+  strimzi                       strimzi-kafka-operator               https://strimzi.io/charts                                    strimzi               platform   eks,baremetal,doks  3
+  zot                           zot                                  https://zotregistry.dev/helm-charts                          zot                   core       baremetal           2
 
   The catalog is closed: no project outside this table is installed by this project.
   external-dns and kubechecks are installed only when the cluster values carry a domain.
   Optionality is the same in every layer. An entry marked `optional` is installed unless the
   cluster values list it in `disable`; an entry marked `optIn` is installed only when they list
   it in `enable`; every other entry is always installed. Every platform-layer entry, longhorn,
-  and local-path-provisioner are optional; zot is opt-in. local-path-provisioner is installed
+  and local-path-provisioner are optional; zot, argocd-agent, and argocd-agent-principal are opt-in. local-path-provisioner is installed
   only when longhorn is disabled.
   local-path-provisioner and the gatekeeper-library templates are sourced from git; every other
   entry is a Helm chart.

@@ -20,6 +20,10 @@ RETURN:
 SIDE-EFFECT:
   - WHEN: a cilium DaemonSet already runs in kube-system, as when Talos installed it during its own bootstrap
     MUST: skip installing Cilium and leave it for Argo CD to adopt
+  - WHEN: provider is doks
+    MUST: skip installing Cilium and render no cilium Application, because DigitalOcean manages Cilium and its settings
+  - WHEN: provider is doks
+    MUST-NOT: modify any object labelled `doks.digitalocean.com/managed=true`
   - WHEN: provider is baremetal
     MUST: "provide `scripts/talos-cilium-patch`, which renders a Talos machine-config patch that disables the Talos CNI and kube-proxy and installs, as an inline manifest, the catalog's Cilium chart at its pinned version and values"
   - WHEN: provider is baremetal
@@ -60,6 +64,12 @@ RETURN:
     MUST: "yield, in namespace `kargo`, a Secret holding the Kargo admin password hash and token signing key, which the kargo Application reads instead of chart values"
   - WHEN: the cluster values carry a domain and provider is baremetal
     MUST: "yield, in namespace `external-dns`, a Secret holding the Cloudflare API token"
+  - WHEN: the cluster values carry a domain and provider is doks
+    MUST: "yield, in namespace `external-dns`, a Secret holding the DigitalOcean API token"
+  - WHEN: argocd-agent is enabled
+    MUST: "yield, in namespace `argocd`, the CA Secret `argocd-agent-ca` and the client certificate Secret `argocd-agent-client-tls`"
+  - WHEN: argocd-agent-principal is enabled
+    MUST: "yield, in namespace `argocd`, the CA Secret `argocd-agent-ca`, the server certificate Secrets `argocd-agent-principal-tls`, `argocd-agent-resource-proxy-tls`, and `argocd-redis-proxy-tls`, and the JWT key Secret `argocd-agent-jwt`"
   - WHEN: the cluster values carry a domain and kubechecks is not disabled
     MUST: "yield, in namespace `kubechecks`, a Secret holding the GitHub token read with `op read` and an Argo CD API token for a local `kubechecks` account, generated once Argo CD is running"
 SIDE-EFFECT:

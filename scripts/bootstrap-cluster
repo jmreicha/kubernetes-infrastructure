@@ -22,7 +22,9 @@ die() {
   exit 1
 }
 val() { yq -r "$1" "$values"; }
-enabled() { [ "$(yq "(.disable // []) | contains([\"$1\"])" "$values")" = false ]; }
+# Exact name match: yq's contains() matches substrings (argocd-agent would match argocd-agent-principal).
+enabled() { [ "$(n=$1 yq '(.disable // []) | any_c(. == strenv(n))' "$values")" = false ]; }
+opted_in() { [ "$(n=$1 yq '(.enable // []) | any_c(. == strenv(n))' "$values")" = true ]; }
 
 # 1. Validate values before touching the cluster.
 "$root/scripts/check-values" "$values" >&2 \
@@ -54,16 +56,22 @@ install() {
     --namespace "$(yq .spec.destination.namespace <<<"$app")" --create-namespace -f "$tmp/$1.values.yaml"
 }
 
-# A bring-your-own StorageClass is provided outside this project, so it must already be the only default.
-if [ "$(val '.defaultStorageClass // ""')" != "" ]; then
+# A StorageClass provided outside this project (bring-your-own, or DigitalOcean's on doks)
+# must already be the only default.
+want_sc=$(val '.defaultStorageClass // ""')
+[ "$provider" = doks ] && want_sc=do-block-storage
+if [ -n "$want_sc" ]; then
   defaults=$(kubectl get storageclass -o jsonpath='{range .items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")]}{.metadata.name} {end}')
-  [ "$(xargs <<<"$defaults")" = "$(val .defaultStorageClass)" ] \
-    || die "defaultStorageClass $(val .defaultStorageClass) must exist and be the only default StorageClass (defaults: ${defaults:-none})"
+  [ "$(xargs <<<"$defaults")" = "$want_sc" ] \
+    || die "$want_sc must exist and be the only default StorageClass (defaults: ${defaults:-none})"
 fi
 
 # 4. CNI first; on EKS it replaces the VPC CNI.
 # Talos may already have installed it from scripts/talos-cilium-patch; Argo CD adopts it.
-if kubectl -n kube-system get daemonset cilium >/dev/null 2>&1; then
+# On doks, DigitalOcean manages Cilium, so it is neither installed nor adopted.
+if [ "$provider" = doks ]; then
+  echo "bootstrap: Cilium is managed by DigitalOcean on doks; skipping it" >&2
+elif kubectl -n kube-system get daemonset cilium >/dev/null 2>&1; then
   echo "bootstrap: Cilium is already installed; leaving it for Argo CD to adopt" >&2
 else
   install cilium
@@ -88,7 +96,8 @@ seed() { # namespace secret key=op://ref|- ...   ('-' reads the value from stdin
     i=$((i + 1))
   done
   kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-  kubectl create secret generic "$secret" -n "$ns" "${args[@]}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl create secret generic "$secret" -n "$ns" "${args[@]}" ${SEED_TYPE:+--type="$SEED_TYPE"} --dry-run=client -o yaml \
+    | kubectl apply -f - >/dev/null
   rm -f "$tmp"/s*
 }
 seed onepassword op-credentials "1password-credentials.json=$(val .secretRefs.onepasswordCredentials)"
@@ -98,6 +107,20 @@ enabled kargo && seed kargo kargo-admin \
   "ADMIN_ACCOUNT_TOKEN_SIGNING_KEY=$(val .secretRefs.kargoTokenSigningKey)"
 [ -n "$domain" ] && [ "$provider" = baremetal ] \
   && seed external-dns cloudflare-api-token "token=$(val .secretRefs.cloudflareApiToken)"
+[ -n "$domain" ] && [ "$provider" = doks ] \
+  && seed external-dns digitalocean-api-token "token=$(val .secretRefs.digitaloceanToken)"
+
+# argocd-agent PKI (spec/bootstrap SecretSeed): the agent's client cert, or the principal's
+# server cert (also used by its resource and Redis proxies) and JWT key. Never generated.
+if opted_in argocd-agent || opted_in argocd-agent-principal; then
+  seed argocd argocd-agent-ca "ca.crt=$(val .secretRefs.argocdAgentCa)"
+  tls() { SEED_TYPE=kubernetes.io/tls seed argocd "$1" "tls.crt=$(val .secretRefs.argocdAgentCert)" "tls.key=$(val .secretRefs.argocdAgentKey)"; }
+  opted_in argocd-agent && tls argocd-agent-client-tls
+  if opted_in argocd-agent-principal; then
+    for s in argocd-agent-principal-tls argocd-agent-resource-proxy-tls argocd-redis-proxy-tls; do tls "$s"; done
+    seed argocd argocd-agent-jwt "jwt.key=$(val .secretRefs.argocdAgentJwtKey)"
+  fi
+fi
 
 # 6. Argo CD.
 install argo-cd
@@ -119,7 +142,9 @@ fi
 
 # 7. Hand over: AppProjects and the cluster root, then wait for Argo CD to adopt both releases.
 render bootstrap | kubectl apply -f - >/dev/null
-for app in cilium argo-cd; do
+adopt=(argo-cd)
+[ "$provider" = doks ] || adopt=(cilium argo-cd)
+for app in "${adopt[@]}"; do
   kubectl -n argocd wait "application/$app" --for=jsonpath='{.status.health.status}'=Healthy --timeout=10m >/dev/null \
     && kubectl -n argocd wait "application/$app" --for=jsonpath='{.status.sync.status}'=Synced --timeout=10m >/dev/null \
     || die "Application $app is not Synced and Healthy within 10m"

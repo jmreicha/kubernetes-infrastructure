@@ -2,12 +2,19 @@
 suite: layers
 templates: [templates/applications.yaml]
 tests:
-  - it: eks core layer renders exactly 16 Applications
+  - it: eks core layer renders exactly 17 Applications
     values: [../clusters/eks.yaml]
     set:
       layer: core
     asserts:
-      - hasDocuments: { count: 16 }
+      - hasDocuments: { count: 17 }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: argocd-agent-principal,
+            any: true,
+          }
       - containsDocument:
           {
             kind: Application,
@@ -402,3 +409,100 @@ tests:
     documentSelector: { path: metadata.name, value: metrics-server }
     asserts:
       - notExists: { path: spec.source.helm.valuesObject.args }
+  - it: doks cluster layer renders Argo CD but not Cilium, which DigitalOcean manages
+    values: [../clusters/doks.yaml]
+    set: { layer: cluster }
+    asserts:
+      - hasDocuments: { count: 1 }
+      - containsDocument: { kind: Application, apiVersion: argoproj.io/v1alpha1, name: argo-cd }
+  - it: doks core layer renders exactly 13 Applications
+    values: [../clusters/doks.yaml]
+    set: { layer: core }
+    asserts:
+      - hasDocuments: { count: 13 }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: argocd-agent, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: cert-manager, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: external-dns, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: external-secrets, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: falco, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: gatekeeper, any: true }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: gatekeeper-templates-general,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: gatekeeper-templates-psp,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: kor, any: true }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: kube-state-metrics,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: metrics-server, any: true }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: onepassword-connect,
+            any: true,
+          }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: opentelemetry-operator,
+            any: true,
+          }
+      - notEqual: { path: metadata.name, value: zot }
+  - it: doks platform layer renders the platform components except VMs
+    values: [../clusters/doks.yaml]
+    set: { layer: platform }
+    asserts:
+      - hasDocuments: { count: 10 }
+      - notEqual: { path: metadata.name, value: kubevirt }
+      - notEqual: { path: metadata.name, value: cdi }
+  - it: doks external-dns uses the digitalocean provider and seeded token
+    values: [../clusters/doks.yaml]
+    set: { layer: core }
+    documentSelector: { path: metadata.name, value: external-dns }
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.provider.name, value: digitalocean }
+      - equal:
+          {
+            path: "spec.source.helm.valuesObject.env[0].valueFrom.secretKeyRef.name",
+            value: digitalocean-api-token,
+          }
+  - it: the agent runs autonomously and dials the hub's principal
+    values: [../clusters/doks.yaml]
+    set: { layer: core }
+    documentSelector: { path: metadata.name, value: argocd-agent }
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.agentMode, value: autonomous }
+      - equal: { path: spec.source.helm.valuesObject.server, value: agent.hub.example.com }
+      - equal: { path: spec.source.helm.valuesObject.serverPort, value: "443" }
+  - it: the principal never generates its own certificates or JWT key
+    values: [../clusters/eks.yaml]
+    set: { layer: core }
+    documentSelector: { path: metadata.name, value: argocd-agent-principal }
+    asserts:
+      - equal:
+          { path: spec.source.helm.valuesObject.principal.tls.server.allowGenerate, value: false }
+      - equal: { path: spec.source.helm.valuesObject.principal.jwt.allowGenerate, value: false }

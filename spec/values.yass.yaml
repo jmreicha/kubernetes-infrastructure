@@ -9,8 +9,15 @@ spec: ClusterValues
 INPUT:
   - MUST: "be a YAML mapping at `clusters/<cluster-name>.yaml`"
   - MUST: "carry `clusterName`, a string equal to `<cluster-name>` in the file name"
-  - MUST: "carry `provider`, exactly one of `eks` or `baremetal`"
-  - MUST: "carry `apiServerHost` and `apiServerPort`, the address Cilium uses in place of kube-proxy"
+  - MUST: "carry `provider`, exactly one of `eks`, `baremetal`, or `doks`"
+  - WHEN: provider is eks or baremetal
+    MUST: "carry `apiServerHost` and `apiServerPort`, the address Cilium uses in place of kube-proxy"
+  - WHEN: provider is doks and domain is present
+    MUST: "carry `secretRefs.digitaloceanToken`, an op:// reference to a DigitalOcean API token with DNS write access"
+  - WHEN: argocd-agent is enabled
+    MUST: "carry `argocdAgent.principalAddress` and `argocdAgent.principalPort`, where the hub's principal listens, and `secretRefs.argocdAgentCa`, `secretRefs.argocdAgentCert`, and `secretRefs.argocdAgentKey`, op:// references to the agent CA and this cluster's client certificate, whose CN is the agent name"
+  - WHEN: argocd-agent-principal is enabled
+    MUST: "carry `secretRefs.argocdAgentCa`, `secretRefs.argocdAgentCert`, `secretRefs.argocdAgentKey`, and `secretRefs.argocdAgentJwtKey`, op:// references to the agent CA, the principal's server certificate, and its JWT signing key"
   - MAY: "carry `domain`, the DNS zone external-dns manages; external-dns is installed only when it is present"
   - MUST: "carry `secretRefs.onepasswordCredentials` and `secretRefs.onepasswordToken`, each an op:// reference"
   - WHEN: kargo is not disabled

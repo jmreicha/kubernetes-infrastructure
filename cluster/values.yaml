@@ -17,6 +17,10 @@ disable: []
 # Catalog entries marked `optIn` are installed only when named here.
 enable: []
 pullThroughCacheIp: ""
+# Where this cluster's argocd-agent finds the hub's principal (when argocd-agent is enabled).
+argocdAgent:
+  principalAddress: ""
+  principalPort: 443
 
 # Upstream registries the pull-through cache (zot) mirrors, by host.
 pullThroughCacheRegistries:
@@ -105,7 +109,7 @@ catalog:
     version: 10.10.2
     namespace: argocd
     layer: bootstrap
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 0
     values: |
       configs:
@@ -134,7 +138,7 @@ catalog:
     version: v1.21.2
     namespace: cert-manager
     layer: core
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 1
     values: |
       crds:
@@ -146,7 +150,7 @@ catalog:
     version: 3.23.1
     namespace: gatekeeper-system
     layer: core
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 1
 
   # gatekeeper-library publishes no releases, so its templates pin a commit.
@@ -156,7 +160,7 @@ catalog:
     version: f8e3b4e9ab3b7d1a28092da75c2c5e71aedfd4b9
     namespace: gatekeeper-system
     layer: core
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 2
 
   - name: gatekeeper-templates-general
@@ -165,7 +169,7 @@ catalog:
     version: f8e3b4e9ab3b7d1a28092da75c2c5e71aedfd4b9
     namespace: gatekeeper-system
     layer: core
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 2
 
   - name: external-secrets
@@ -174,7 +178,7 @@ catalog:
     version: 2.12.0
     namespace: external-secrets
     layer: core
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 1
 
   - name: onepassword-connect
@@ -183,7 +187,7 @@ catalog:
     version: 2.4.2
     namespace: onepassword
     layer: core
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 1
     values: |
       connect:
@@ -257,6 +261,48 @@ catalog:
         - node: DEFAULT_PATH_FOR_NON_LISTED_NODES
           paths: [/var/local-path-provisioner]
 
+  # Argo CD agent (argoproj-labs/argocd-agent): opt-in hub-and-spoke visibility over each
+  # cluster's own Argo CD. Certificates come from 1Password via bootstrap, never generated.
+  - name: argocd-agent
+    chart: argocd-agent-agent
+    repoURL: oci://ghcr.io/argoproj-labs/argocd-agent
+    version: 0.2.8
+    namespace: argocd
+    layer: core
+    optIn: true
+    providers: [eks, baremetal, doks]
+    wave: 2
+    values: |
+      agentMode: autonomous
+      server: {{ .Values.argocdAgent.principalAddress | quote }}
+      serverPort: {{ .Values.argocdAgent.principalPort | quote }}
+      auth: mtls:any
+      tlsSecretName: argocd-agent-client-tls
+      tlsRootCASecretName: argocd-agent-ca
+
+  - name: argocd-agent-principal
+    chart: argocd-agent-principal
+    repoURL: oci://ghcr.io/argoproj-labs/argocd-agent
+    version: 0.3.6
+    namespace: argocd
+    layer: core
+    optIn: true
+    providers: [eks, baremetal, doks]
+    wave: 2
+    values: |
+      service:
+        type: LoadBalancer
+      principal:
+        auth: mtls:CN=([^,]+)
+        jwt:
+          allowGenerate: false
+          secretName: argocd-agent-jwt
+        tls:
+          secretName: argocd-agent-principal-tls
+          server:
+            allowGenerate: false
+            rootCaSecretName: argocd-agent-ca
+
   - name: zot
     chart: zot
     repoURL: https://zotregistry.dev/helm-charts
@@ -309,7 +355,7 @@ catalog:
     version: 1.23.0
     namespace: external-dns
     layer: core
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 2
     when: '{{ ne .Values.domain "" }}'
     values: |
@@ -319,6 +365,15 @@ catalog:
       {{- if eq .Values.provider "eks" }}
       provider:
         name: aws
+      {{- else if eq .Values.provider "doks" }}
+      provider:
+        name: digitalocean
+      env:
+        - name: DO_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: digitalocean-api-token
+              key: token
       {{- else }}
       provider:
         name: cloudflare
@@ -350,7 +405,7 @@ catalog:
     version: 9.2.0
     namespace: falco
     layer: core
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 2
     values: |
       driver:
@@ -362,7 +417,7 @@ catalog:
     version: 3.14.0
     namespace: kube-system
     layer: core
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 2
     values: |
       {{- if eq .Values.provider "baremetal" }}
@@ -376,7 +431,7 @@ catalog:
     version: 8.6.0
     namespace: kube-system
     layer: core
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 2
 
   - name: opentelemetry-operator
@@ -385,7 +440,7 @@ catalog:
     version: 0.124.1
     namespace: opentelemetry
     layer: core
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 2
 
   - name: kor
@@ -394,7 +449,7 @@ catalog:
     version: 0.2.16
     namespace: kor
     layer: core
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 2
     # The chart defaults to :latest; pin the image (spec/security).
     values: |
@@ -416,7 +471,7 @@ catalog:
     namespace: strimzi
     layer: platform
     optional: true
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 3
     values: |
       watchAnyNamespace: true
@@ -428,7 +483,7 @@ catalog:
     namespace: everest-system
     layer: platform
     optional: true
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 3
     # Generated once at install; regenerating them would rotate the JWT and certs.
     ignoreDifferences:
@@ -492,7 +547,7 @@ catalog:
     namespace: crossplane-system
     layer: platform
     optional: true
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 4
 
   - name: keda
@@ -502,7 +557,7 @@ catalog:
     namespace: keda
     layer: platform
     optional: true
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 4
 
   - name: reloader
@@ -512,7 +567,7 @@ catalog:
     namespace: reloader
     layer: platform
     optional: true
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 4
 
   - name: argocd-image-updater
@@ -522,7 +577,7 @@ catalog:
     namespace: argocd
     layer: platform
     optional: true
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 4
 
   - name: k6-operator
@@ -532,7 +587,7 @@ catalog:
     namespace: k6-operator-system
     layer: platform
     optional: true
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 4
 
   - name: atlas-operator
@@ -542,7 +597,7 @@ catalog:
     namespace: atlas-operator
     layer: platform
     optional: true
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 4
 
   - name: kargo
@@ -552,7 +607,7 @@ catalog:
     namespace: kargo
     layer: platform
     optional: true
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 4
     values: |
       api:
@@ -566,7 +621,7 @@ catalog:
     namespace: kubechecks
     layer: platform
     optional: true
-    providers: [eks, baremetal]
+    providers: [eks, baremetal, doks]
     wave: 4
     when: '{{ ne .Values.domain "" }}'
     values: |

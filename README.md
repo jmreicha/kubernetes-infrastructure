@@ -1,6 +1,7 @@
 # Kubernetes Infrastructure
 
-Foundational infrastructure for EKS and bare-metal (Talos) Kubernetes clusters, delivered by
+Foundational infrastructure for EKS, bare-metal (Talos), and DigitalOcean (DOKS) Kubernetes
+clusters, delivered by
 Argo CD. One values file per cluster; everything else is shared and pinned.
 
 ## How it works
@@ -16,8 +17,8 @@ A cluster comes up in three layers, each waiting for the one before it to be Syn
 - **`cluster/`** is a Helm chart. `cluster/values.yaml` is the catalog: every project with its chart,
   pinned version, namespace, layer, providers, and sync wave. The chart turns the catalog plus a
   cluster's values into Argo CD Applications.
-- **`clusters/<name>.yaml`** holds the only per-cluster settings: provider (`eks` or
-  `baremetal`), API endpoint, domain, `disable` list, and `op://` references for secrets.
+- **`clusters/<name>.yaml`** holds the only per-cluster settings: provider (`eks`,
+  `baremetal`, or `doks`), API endpoint, domain, `disable` list, and `op://` references for secrets.
 - **`scripts/bootstrap-cluster`** installs Cilium and Argo CD, seeds secrets from 1Password, and applies a single
   `cluster` root Application. From then on Argo CD manages everything, including itself.
 - **Renovate** keeps the catalog's versions current (after 7 days of stability); CI checks every
@@ -77,6 +78,9 @@ Remove the inline manifest afterwards so `talosctl upgrade-k8s` can't roll back 
 - **Turn components on or off** per cluster, the same way in every layer: `disable: [name]`
   removes an optional component, `enable: [name]` adds an opt-in one. On bare metal,
   `disable: [longhorn]` switches storage to local-path-provisioner.
+- **Argo CD agent:** `enable: [argocd-agent]` with `argocdAgent.principalAddress` reports a
+  cluster's Argo CD to a hub; the hub sets `enable: [argocd-agent-principal]`. Certificates are
+  `op://` references.
 - **Pull-through cache (bare metal):** `enable: [zot]` plus `pullThroughCacheIp`, then apply
   `scripts/talos-registry-patch clusters/<name>.yaml` to the Talos machine config.
 - **Upgrade a project:** Renovate opens the PR; to do it by hand, bump `version` in

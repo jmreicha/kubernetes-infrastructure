@@ -1,7 +1,8 @@
 {{- /* Default-deny ingress per managed namespace, owned by the lowest layer that deploys into it (spec/security). */ -}}
 {{- $own := dict "cluster" (list "bootstrap") "core" (list "core") "platform" (list "platform") }}
 {{- $lower := dict "cluster" (list) "core" (list "bootstrap") "platform" (list "bootstrap" "core") }}
-{{- if hasKey $own .Values.layer }}
+{{- /* DigitalOcean manages Cilium on doks; without audit mode these would enforce. */ -}}
+{{- if and (hasKey $own .Values.layer) (ne .Values.provider "doks") }}
 {{- $ns := include "apps.namespaces" . | fromYaml }}
 {{- $taken := list }}
 {{- range (get $lower .Values.layer) }}{{ $taken = concat $taken (get $ns .) }}{{ end }}
@@ -36,4 +37,23 @@ spec:
 {{- end }}
 {{- end }}
 {{- end }}
+{{- end }}
+{{- /* The principal accepts agents from other clusters (spec/security). */ -}}
+{{- $principal := dict "name" "argocd-agent-principal" }}
+{{- range .Values.catalog }}{{ if eq .name "argocd-agent-principal" }}{{ $principal = . }}{{ end }}{{ end }}
+{{- if and (eq .Values.layer "cluster") (ne .Values.provider "doks") (eq (include "apps.enabled" (dict "entry" $principal "root" $)) "true") }}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-agent-principal
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-agent-principal
+  ingress:
+    - fromEntities: [world, cluster]
 {{- end }}

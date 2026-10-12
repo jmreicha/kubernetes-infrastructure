@@ -16,18 +16,27 @@ INPUT:
     MUST: rely on EKS envelope encryption of Secrets with a KMS key, configured outside the cluster
   - WHEN: provider is baremetal
     MUST: rely on Talos encrypting Secrets at rest, which it does by default
+  - WHEN: provider is doks
+    MUST: rely on DigitalOcean encrypting Secrets at rest and traffic within the cluster's VPC
 RETURN:
   - MUST: "yield AppProjects whose sourceRepos are only this repository and the repoURLs of their layer's catalog entries, and whose destinations are only their layer's managed namespaces plus `argocd`"
   - MUST: "label every managed namespace `pod-security.kubernetes.io/enforce=baseline`, except the privileged namespaces, which are labelled `enforce=privileged`"
   - MUST: "label every managed namespace `pod-security.kubernetes.io/warn=restricted` and `audit=restricted`"
   - MUST: give every Application that shares a namespace the same namespace labels
-  - MUST: install Cilium with WireGuard transparent encryption between nodes
-  - MUST: "install, in every managed namespace except `kube-system` and `envoy-gateway-system`, a CiliumNetworkPolicy that denies ingress except from the same namespace, from `envoy-gateway-system`, and from the kube-apiserver, host, remote-node, and health entities"
+  - WHEN: provider is eks or baremetal
+    MUST: install Cilium with WireGuard transparent encryption between nodes
+  - WHEN: provider is doks
+    MUST-NOT: install CiliumNetworkPolicies, because DigitalOcean manages Cilium and policy audit mode cannot be turned on, so they would enforce immediately
+  - WHEN: provider is eks or baremetal
+    MUST: "install, in every managed namespace except `kube-system` and `envoy-gateway-system`, a CiliumNetworkPolicy that denies ingress except from the same namespace, from `envoy-gateway-system`, and from the kube-apiserver, host, remote-node, and health entities"
   - MUST: "allow ingress to `argocd` from `kubechecks`, which calls the Argo CD API"
   - MUST: render each namespace's CiliumNetworkPolicy from the lowest layer that deploys into it, so no two Applications own the same policy
   - MUST-NOT: "install a CiliumNetworkPolicy in `kube-system`, which runs cluster DNS and provider-managed components this project does not own"
   - MUST: "install, in `envoy-gateway-system`, a CiliumNetworkPolicy that allows ingress from the world and cluster entities, because its data plane receives external traffic"
-  - MUST: run Cilium in policy audit mode, so denied flows are reported by Hubble and not dropped
+  - WHEN: argocd-agent-principal is enabled and provider is eks or baremetal
+    MUST: allow ingress from the world and cluster entities to the principal's pods in `argocd`, because agents on other clusters connect to it
+  - WHEN: provider is eks or baremetal
+    MUST: run Cilium in policy audit mode, so denied flows are reported by Hubble and not dropped
   - MUST: "install the gatekeeper-library pod-security-policy and general ConstraintTemplates, pinned to a commit"
   - MUST: "install Constraints with `enforcementAction: dryrun` that report privileged containers, host namespaces, host networking and ports, hostPath volumes, images tagged `latest`, and containers without CPU and memory requests"
   - MUST: exclude the privileged namespaces from the host-access Constraints

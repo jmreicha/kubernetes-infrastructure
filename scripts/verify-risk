@@ -30,7 +30,7 @@ docs() { # render-dir -> JSON array of docs tagged with renderedBy; generated re
 }
 
 # Base renders share this checkout's chart cache, so unchanged charts aren't downloaded again.
-export CHART_CACHE="$root/.cache/charts"
+export CHART_CACHE="${CHART_CACHE:-$root/.cache/charts}" GIT_CACHE="${GIT_CACHE:-$root/.cache/git}"
 for values in "$root"/tests/clusters/*.yaml; do
   f=$(basename "$values" .yaml)
   "$root/scripts/render" "$values" "$out/head/$f" >/dev/null 2>&1 || touch "$out/$f.failed" &

@@ -10,6 +10,7 @@ setup() {
   mkdir -p "$work/clusters"
   cp tests/clusters/baremetal.yaml "$work/clusters/baremetal.yaml"
   yq '.clusterName = "eks"' tests/clusters/eks.yaml >"$work/clusters/eks.yaml"
+  cp tests/clusters/doks.yaml "$work/clusters/doks.yaml"
 }
 teardown() { rm -rf "$CALLS" "$APPLIED" "$work"; }
 

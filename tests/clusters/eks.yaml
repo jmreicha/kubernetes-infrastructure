@@ -12,3 +12,9 @@ secretRefs:
   kargoAdminPasswordHash: op://infra/eks-kargo/password-hash
   kargoTokenSigningKey: op://infra/eks-kargo/signing-key
   githubToken: op://infra/kubechecks/github-token
+  argocdAgentCa: op://infra/argocd-agent/ca
+  argocdAgentCert: op://infra/argocd-agent-principal/cert
+  argocdAgentKey: op://infra/argocd-agent-principal/key
+  argocdAgentJwtKey: op://infra/argocd-agent-principal/jwt-key
+enable:
+  - argocd-agent-principal
