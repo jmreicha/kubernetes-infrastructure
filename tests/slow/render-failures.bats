@@ -20,7 +20,7 @@ setup() {
 
 @test "host access outside a privileged namespace fails" {
   yq -i '.privilegedNamespaces -= ["falco"]' "$repo/cluster/values.yaml"
-  yq -i '.enable = ["falco"]' "$repo/tests/clusters/eks-minimal.yaml"
+  yq -i '.enable = ["falco"]' "$repo/examples/eks-minimal.yaml"
   run "$repo/scripts/verify-render" "$BATS_TEST_TMPDIR/out"
   [ "$status" -ne 0 ]
   [[ "$output" == *"in baseline namespace falco"* ]]

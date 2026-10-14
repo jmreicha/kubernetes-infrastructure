@@ -1,0 +1,76 @@
+# Talos, full stack with a domain; Longhorn storage; zot pull-through cache.
+# Copy to clusters/<name>.yaml and set clusterName to <name> (see README).
+
+# Must match the file name, without .yaml.
+clusterName: baremetal
+
+# eks, baremetal, or doks.
+provider: baremetal
+
+# Kubernetes minor version; API checks run against it.
+kubernetesVersion: "1.34"
+
+# API server endpoint Cilium uses in place of kube-proxy (eks, baremetal; not doks).
+# On Talos, use KubePrism: localhost:7445.
+apiServerHost: localhost
+apiServerPort: 7445
+
+# AWS region and VPC for Karpenter, the AWS Load Balancer Controller, and external-dns (eks only).
+# region: us-west-2
+# vpcId: vpc-0123456789abcdef0
+
+# CIDRs Cilium LB-IPAM hands out to LoadBalancer Services, announced over L2 (baremetal only).
+lbIpPool: [10.10.0.0/28]
+
+# DNS zone this cluster owns; without it, external-dns and kubechecks aren't installed.
+domain: lab.example.com
+
+# Stop after the core layer (no platform components).
+# coreOnly: true
+
+# Opt-in components to add: zot and rook (baremetal), falco, tetragon,
+# argocd-agent, argocd-agent-principal.
+enable:
+  - zot # pull-through registry cache; needs pullThroughCacheIp
+
+# Optional components to remove: any platform component, longhorn, local-path-provisioner.
+# disable: [kargo]
+
+# Your own default StorageClass; baremetal only, with longhorn and local-path-provisioner
+# both disabled and rook not enabled.
+# defaultStorageClass: nfs
+
+# Address in lbIpPool for zot's LoadBalancer; nodes mirror registries through it (with zot).
+pullThroughCacheIp: 10.10.0.5
+
+# Where the hub's argocd-agent-principal listens (with argocd-agent).
+# argocdAgent:
+#   principalAddress: agent.hub.example.com
+#   principalPort: 443
+
+# 1Password references read by bootstrap with `op read`; never secret values.
+secretRefs:
+  # Connect credentials and operator token (always required).
+  onepasswordCredentials: op://infra/lab-connect/credentials
+  onepasswordToken: op://infra/lab-connect/token
+
+  # Kargo admin login (unless kargo is disabled).
+  kargoAdminPasswordHash: op://infra/lab-kargo/password-hash
+  kargoTokenSigningKey: op://infra/lab-kargo/signing-key
+
+  # Cloudflare token for external-dns (baremetal, with a domain).
+  cloudflareApiToken: op://infra/cloudflare/api-token
+
+  # DigitalOcean token for external-dns (doks, with a domain).
+  # digitaloceanToken: op://infra/lab/digitaloceanToken
+
+  # GitHub token for kubechecks PR comments (with a domain, unless kubechecks is disabled).
+  githubToken: op://infra/kubechecks/github-token
+
+  # argocd-agent mTLS: shared CA plus this cluster's cert and key (with either agent role).
+  # argocdAgentCa: op://infra/lab/argocdAgentCa
+  # argocdAgentCert: op://infra/lab/argocdAgentCert
+  # argocdAgentKey: op://infra/lab/argocdAgentKey
+
+  # JWT signing key (with argocd-agent-principal).
+  # argocdAgentJwtKey: op://infra/lab/argocdAgentJwtKey

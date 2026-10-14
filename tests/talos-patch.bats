@@ -4,14 +4,14 @@ setup() {
 }
 
 @test "patch removes Talos's Flannel CNI and kube-proxy (Talos 1.14 documents)" {
-  run scripts/talos-cilium-patch tests/clusters/baremetal.yaml
+  run scripts/talos-cilium-patch examples/baremetal.yaml
   [ "$status" -eq 0 ]
   [ "$(yq -N 'select(.kind == "KubeFlannelCNIConfig") | ."$patch"' <<<"$output")" = delete ]
   [ "$(yq -N 'select(.kind == "KubeProxyConfig") | .enabled' <<<"$output")" = false ]
 }
 
 @test "patch inlines the catalog's Cilium chart, version, and values" {
-  run scripts/talos-cilium-patch tests/clusters/baremetal.yaml
+  run scripts/talos-cilium-patch examples/baremetal.yaml
   [ "$status" -eq 0 ]
   [ "$(yq -N 'select(.kind == "KubeInlineManifestConfig") | .name' <<<"$output")" = cilium ]
   manifests=$(yq -N 'select(.kind == "KubeInlineManifestConfig") | .manifest' <<<"$output")
@@ -22,13 +22,13 @@ setup() {
 }
 
 @test "patch is only for baremetal clusters" {
-  run scripts/talos-cilium-patch tests/clusters/eks.yaml
+  run scripts/talos-cilium-patch examples/eks.yaml
   [ "$status" -ne 0 ]
   [[ "$output" == *baremetal* ]]
 }
 
 zot_values() {
-  yq '.enable = ["zot"] | .pullThroughCacheIp = "10.10.0.5"' tests/clusters/baremetal.yaml >"$BATS_TEST_TMPDIR/zot.yaml"
+  yq '.enable = ["zot"] | .pullThroughCacheIp = "10.10.0.5"' examples/baremetal.yaml >"$BATS_TEST_TMPDIR/zot.yaml"
   echo "$BATS_TEST_TMPDIR/zot.yaml"
 }
 
@@ -46,7 +46,7 @@ zot_values() {
 }
 
 @test "registry patch needs zot enabled" {
-  run scripts/talos-registry-patch tests/clusters/baremetal-minimal.yaml
+  run scripts/talos-registry-patch examples/baremetal-minimal.yaml
   [ "$status" -ne 0 ]
   [[ "$output" == *"enable: [zot]"* ]]
 }
@@ -60,7 +60,7 @@ talos_accepts() { # patch-file
 }
 
 @test "Talos accepts the Cilium patch" {
-  scripts/talos-cilium-patch tests/clusters/baremetal.yaml >"$BATS_TEST_TMPDIR/cilium.yaml"
+  scripts/talos-cilium-patch examples/baremetal.yaml >"$BATS_TEST_TMPDIR/cilium.yaml"
   run talos_accepts "$BATS_TEST_TMPDIR/cilium.yaml"
   [ "$status" -eq 0 ]
 }

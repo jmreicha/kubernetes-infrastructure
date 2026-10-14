@@ -3,11 +3,11 @@
 make_repo() {
   real=$(cd "$BATS_TEST_DIRNAME/../.." && pwd)
   repo=$BATS_TEST_TMPDIR/repo
-  mkdir -p "$repo/tests/clusters"
+  mkdir -p "$repo/examples" "$repo/tests"
   cp -R "$real/cluster" "$real/scripts" "$real/policies" "$repo/"
   cp "$real/tests/tool-versions.env" "$repo/tests/"
   cp "$real/mise.toml" "$repo/"
-  cp "$real/tests/clusters/eks-minimal.yaml" "$repo/tests/clusters/"
+  cp "$real/examples/eks-minimal.yaml" "$repo/examples/"
   mkdir -p "$real/.cache" && ln -s "$real/.cache" "$repo/.cache"
   printf '.cache\n' >"$repo/.gitignore"
   git -C "$repo" init -q && git -C "$repo" add -A

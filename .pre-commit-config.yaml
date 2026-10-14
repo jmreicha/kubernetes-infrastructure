@@ -83,7 +83,7 @@ repos:
         name: validate cluster values (conftest)
         entry: mise exec yq conftest -- scripts/check-values
         language: system
-        files: ^(clusters|tests/clusters)/.*\.yaml$
+        files: ^(clusters|examples)/.*\.yaml$
         priority: 10
       - id: regal
         name: lint rego policies (regal)
@@ -112,14 +112,14 @@ repos:
         name: test cluster chart (helm-unittest)
         entry: mise exec helm github:helm-unittest/helm-unittest -- scripts/chart-tests
         language: system
-        files: ^(cluster|tests/(chart|clusters))/
+        files: ^(cluster|examples|tests/chart)/
         pass_filenames: false
         priority: 20
       - id: bats-tests
         name: test bootstrap, talos patches, render helpers, renovate, catalog (bats)
         entry: mise exec -- scripts/bats-tests
         language: system
-        files: ^(scripts|tests|cluster|policies|\.github/renovate\.json5)
+        files: ^(scripts|tests|examples|cluster|policies|\.github/renovate\.json5)
         pass_filenames: false
         priority: 20
 

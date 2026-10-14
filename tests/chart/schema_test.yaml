@@ -3,7 +3,7 @@ suite: schema
 templates: [templates/applications.yaml]
 tests:
   - it: a well-formed entry renders
-    values: [../clusters/eks.yaml]
+    values: [../../examples/eks.yaml]
     set:
       layer: core
       catalog:
@@ -20,7 +20,7 @@ tests:
     asserts:
       - hasDocuments: { count: 1 }
   - it: a misspelled key is rejected
-    values: [../clusters/eks.yaml]
+    values: [../../examples/eks.yaml]
     set:
       layer: core
       catalog:
@@ -38,7 +38,7 @@ tests:
     asserts:
       - failedTemplate: { errorPattern: "optinal" }
   - it: a missing version is rejected
-    values: [../clusters/eks.yaml]
+    values: [../../examples/eks.yaml]
     set:
       layer: core
       catalog:
@@ -54,7 +54,7 @@ tests:
     asserts:
       - failedTemplate: { errorPattern: "version" }
   - it: an unknown layer is rejected
-    values: [../clusters/eks.yaml]
+    values: [../../examples/eks.yaml]
     set:
       layer: core
       catalog:
@@ -71,7 +71,7 @@ tests:
     asserts:
       - failedTemplate: { errorPattern: "layer" }
   - it: an unknown provider is rejected
-    values: [../clusters/eks.yaml]
+    values: [../../examples/eks.yaml]
     set:
       layer: core
       catalog:
@@ -88,7 +88,7 @@ tests:
     asserts:
       - failedTemplate: { errorPattern: "providers" }
   - it: chart and path together are rejected
-    values: [../clusters/eks.yaml]
+    values: [../../examples/eks.yaml]
     set:
       layer: core
       catalog:
@@ -106,7 +106,7 @@ tests:
     asserts:
       - failedTemplate: {}
   - it: optional and optIn together are rejected
-    values: [../clusters/eks.yaml]
+    values: [../../examples/eks.yaml]
     set:
       layer: core
       catalog:

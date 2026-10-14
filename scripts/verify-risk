@@ -31,17 +31,17 @@ docs() { # render-dir -> JSON array of docs tagged with renderedBy; generated re
 
 # Base renders share this checkout's chart cache, so unchanged charts aren't downloaded again.
 export CHART_CACHE="${CHART_CACHE:-$root/.cache/charts}" GIT_CACHE="${GIT_CACHE:-$root/.cache/git}"
-for values in "$root"/tests/clusters/*.yaml; do
+for values in "$root"/examples/*.yaml; do
   f=$(basename "$values" .yaml)
   "$root/scripts/render" "$values" "$out/head/$f" >/dev/null 2>&1 || touch "$out/$f.failed" &
-  if [ -f "$out/base-tree/tests/clusters/$f.yaml" ] && [ -d "$out/base-tree/cluster" ]; then
-    "$out/base-tree/scripts/render" "$out/base-tree/tests/clusters/$f.yaml" "$out/base/$f" >/dev/null 2>&1 || touch "$out/$f.failed" &
+  if [ -f "$out/base-tree/examples/$f.yaml" ] && [ -d "$out/base-tree/cluster" ]; then
+    "$out/base-tree/scripts/render" "$out/base-tree/examples/$f.yaml" "$out/base/$f" >/dev/null 2>&1 || touch "$out/$f.failed" &
   fi
 done
 wait
 
 fail=0
-for values in "$root"/tests/clusters/*.yaml; do
+for values in "$root"/examples/*.yaml; do
   f=$(basename "$values" .yaml)
   echo "== $f" >&2
   [ ! -e "$out/$f.failed" ] || {

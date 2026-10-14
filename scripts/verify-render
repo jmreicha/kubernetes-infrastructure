@@ -32,14 +32,14 @@ check() { # values-file -> 0 when every render-tier check passes for that fixtur
 }
 
 mkdir -p "$out"
-for values in "$root"/tests/clusters/*.yaml; do
+for values in "$root"/examples/*.yaml; do
   f=$(basename "$values" .yaml)
   { check "$values" "$out/$f" || touch "$out/$f.failed"; } >"$out/$f.log" 2>&1 &
 done
 wait
 
 fail=0
-for values in "$root"/tests/clusters/*.yaml; do
+for values in "$root"/examples/*.yaml; do
   f=$(basename "$values" .yaml)
   echo "== $f" >&2
   cat "$out/$f.log" >&2

@@ -8,9 +8,9 @@ setup() {
   export PATH="$BATS_TEST_DIRNAME/stubs:$PATH" BOOTSTRAP_WAIT=0
   work=$(mktemp -d)
   mkdir -p "$work/clusters"
-  cp tests/clusters/baremetal.yaml "$work/clusters/baremetal.yaml"
-  yq '.clusterName = "eks"' tests/clusters/eks.yaml >"$work/clusters/eks.yaml"
-  cp tests/clusters/doks.yaml "$work/clusters/doks.yaml"
+  cp examples/baremetal.yaml "$work/clusters/baremetal.yaml"
+  yq '.clusterName = "eks"' examples/eks.yaml >"$work/clusters/eks.yaml"
+  cp examples/doks.yaml "$work/clusters/doks.yaml"
 }
 teardown() { rm -rf "$CALLS" "$APPLIED" "$work"; }
 

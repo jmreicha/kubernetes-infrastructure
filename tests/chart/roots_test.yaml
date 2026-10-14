@@ -3,7 +3,7 @@ suite: roots
 templates: [templates/roots.yaml, templates/projects.yaml, templates/cilium-lb.yaml]
 tests:
   - it: cluster layer renders both layer roots
-    values: [../clusters/eks.yaml]
+    values: [../../examples/eks.yaml]
     set: { layer: cluster, clusterValuesFile: clusters/eks.yaml }
     template: templates/roots.yaml
     asserts:
@@ -13,14 +13,14 @@ tests:
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: root-platform, any: true }
   - it: coreOnly omits the platform root
-    values: [../clusters/eks.yaml]
+    values: [../../examples/eks.yaml]
     set: { layer: cluster, coreOnly: true, clusterValuesFile: clusters/eks.yaml }
     template: templates/roots.yaml
     asserts:
       - hasDocuments: { count: 1 }
       - containsDocument: { kind: Application, apiVersion: argoproj.io/v1alpha1, name: root-core }
   - it: bootstrap layer renders only the cluster root, pointed at the cluster's values
-    values: [../clusters/eks.yaml]
+    values: [../../examples/eks.yaml]
     set: { layer: bootstrap, clusterValuesFile: clusters/eks.yaml }
     template: templates/roots.yaml
     asserts:
@@ -28,7 +28,7 @@ tests:
       - equal: { path: metadata.name, value: cluster }
       - equal: { path: spec.source.helm.valueFiles, value: [../clusters/eks.yaml] }
   - it: bootstrap layer renders both AppProjects
-    values: [../clusters/eks.yaml]
+    values: [../../examples/eks.yaml]
     set: { layer: bootstrap, clusterValuesFile: clusters/eks.yaml }
     template: templates/projects.yaml
     asserts:
@@ -38,33 +38,33 @@ tests:
       - containsDocument:
           { kind: AppProject, apiVersion: argoproj.io/v1alpha1, name: platform, any: true }
   - it: root Applications require clusterValuesFile
-    values: [../clusters/eks.yaml]
+    values: [../../examples/eks.yaml]
     set: { layer: cluster }
     template: templates/roots.yaml
     asserts:
       - failedTemplate: { errorMessage: clusterValuesFile is required }
   - it: baremetal renders the LB-IPAM pool from lbIpPool
-    values: [../clusters/baremetal.yaml]
+    values: [../../examples/baremetal.yaml]
     set: { layer: cluster, clusterValuesFile: clusters/baremetal.yaml }
     template: templates/cilium-lb.yaml
     documentSelector: { path: kind, value: CiliumLoadBalancerIPPool }
     asserts:
       - equal: { path: spec.blocks, value: [{ cidr: 10.10.0.0/28 }] }
   - it: baremetal announces LB addresses over L2
-    values: [../clusters/baremetal.yaml]
+    values: [../../examples/baremetal.yaml]
     set: { layer: cluster, clusterValuesFile: clusters/baremetal.yaml }
     template: templates/cilium-lb.yaml
     documentSelector: { path: kind, value: CiliumL2AnnouncementPolicy }
     asserts:
       - equal: { path: spec.loadBalancerIPs, value: true }
   - it: eks renders no LB-IPAM pool
-    values: [../clusters/eks.yaml]
+    values: [../../examples/eks.yaml]
     set: { layer: cluster, clusterValuesFile: clusters/eks.yaml }
     template: templates/cilium-lb.yaml
     asserts:
       - hasDocuments: { count: 0 }
   - it: an empty platform layer still renders a valid AppProject
-    values: [../clusters/eks-minimal.yaml]
+    values: [../../examples/eks-minimal.yaml]
     set: { layer: bootstrap, clusterValuesFile: clusters/eks-minimal.yaml }
     template: templates/projects.yaml
     documentSelector: { path: metadata.name, value: platform }

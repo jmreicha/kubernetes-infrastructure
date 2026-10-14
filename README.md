@@ -19,6 +19,8 @@ A cluster comes up in three layers, each waiting for the one before it to be Syn
   cluster's values into Argo CD Applications.
 - **`clusters/<name>.yaml`** holds the only per-cluster settings: provider (`eks`,
   `baremetal`, or `doks`), API endpoint, domain, `disable` list, and `op://` references for secrets.
+  It's a Helm values file layered over `cluster/values.yaml` (`helm template cluster/ -f clusters/<name>.yaml`).
+  Argo CD renders it from git, so merging a change to it updates the cluster. See `examples/`.
 - **`scripts/bootstrap-cluster`** installs Cilium and Argo CD, seeds secrets from 1Password, and applies a single
   `cluster` root Application. From then on Argo CD manages everything, including itself.
 - **Renovate** keeps the catalog's versions current (after 7 days of stability); CI checks every
@@ -33,9 +35,10 @@ is built against; [`docs/design.md`](docs/design.md) explains the decisions behi
 | ------------------------- | ---------------------------------------------------------------------------------------------- |
 | `cluster/`                | App-of-apps chart; `values.yaml` is the catalog, `values.schema.json` its shape                |
 | `clusters/`               | One values file per cluster ([`spec/values`](spec/values.yass.yaml))                           |
+| `examples/`               | Example cluster values to copy from; also the test fixtures, so they stay valid                |
 | `scripts/`                | Every entry point: `bootstrap`, `test`, `cibuild`, `bootstrap-cluster`, and the tools they use |
 | `policies/`               | Rego for cluster values, render rules, and risky-change checks, with tests                     |
-| `tests/`                  | Chart tests (`tests/chart/`), bats tests, stubs, and fixtures                                  |
+| `tests/`                  | Chart tests (`tests/chart/`), bats tests, and stubs                                            |
 | `root.yass.yaml`, `spec/` | The specs                                                                                      |
 | `archive/`                | The previous layout, kept for reference; not deployed or tested                                |
 
@@ -52,10 +55,20 @@ scripts/bootstrap
 ## Bring up a cluster
 
 1. Start from a fresh cluster. On Talos, disable kube-proxy and flannel in the machine config.
-2. Write its values file, starting from a fixture; secrets are `op://` references, never values:
+2. Copy the closest example to `clusters/<name>.yaml`, then set `clusterName` to `<name>` and
+   replace the addresses and `op://` references (secrets are references, never values):
+
+   | Example                  | Shows                                                         |
+   | ------------------------ | ------------------------------------------------------------- |
+   | `eks.yaml`               | EKS, full stack with a domain, Falco; Argo CD agent hub       |
+   | `eks-minimal.yaml`       | EKS, core layer only, no domain                               |
+   | `baremetal.yaml`         | Talos, full stack with a domain, Longhorn, zot cache          |
+   | `baremetal-minimal.yaml` | Talos, core only, local-path-provisioner instead of Longhorn  |
+   | `baremetal-rook.yaml`    | Talos, core only, Rook Ceph instead of Longhorn               |
+   | `doks.yaml`              | DigitalOcean, full stack with a domain, Tetragon; agent spoke |
 
    ```bash
-   cp tests/clusters/baremetal.yaml clusters/<name>.yaml   # or tests/clusters/eks.yaml
+   cp examples/baremetal.yaml clusters/<name>.yaml
    ```
 
 3. Point kubectl at the cluster, sign in to the [1Password CLI](https://developer.1password.com/docs/cli/)

@@ -6,7 +6,7 @@ setup() {
 
 @test "four parallel renders of git- and Helm-sourced charts all succeed from a cold cache" {
   for i in 1 2 3 4; do
-    scripts/render "$PWD/tests/clusters/eks-minimal.yaml" "$BATS_TEST_TMPDIR/out$i" >/dev/null 2>&1 || touch "$BATS_TEST_TMPDIR/failed$i" &
+    scripts/render "$PWD/examples/eks-minimal.yaml" "$BATS_TEST_TMPDIR/out$i" >/dev/null 2>&1 || touch "$BATS_TEST_TMPDIR/failed$i" &
   done
   wait
   [ -z "$(ls "$BATS_TEST_TMPDIR"/failed* 2>/dev/null)" ]

@@ -1,0 +1,77 @@
+# EKS, full stack with a domain; Falco on; hub for the Argo CD agent.
+# Copy to clusters/<name>.yaml and set clusterName to <name> (see README).
+
+# Must match the file name, without .yaml.
+clusterName: eks
+
+# eks, baremetal, or doks.
+provider: eks
+
+# Kubernetes minor version; API checks run against it.
+kubernetesVersion: "1.34"
+
+# API server endpoint Cilium uses in place of kube-proxy (eks, baremetal; not doks).
+# On Talos, use KubePrism: localhost:7445.
+apiServerHost: ABCDEF.gr7.us-west-2.eks.amazonaws.com
+apiServerPort: 443
+
+# AWS region and VPC for Karpenter, the AWS Load Balancer Controller, and external-dns (eks only).
+region: us-west-2
+vpcId: vpc-0123456789abcdef0
+
+# CIDRs Cilium LB-IPAM hands out to LoadBalancer Services, announced over L2 (baremetal only).
+# lbIpPool: [10.10.0.0/28]
+
+# DNS zone this cluster owns; without it, external-dns and kubechecks aren't installed.
+domain: eks.example.com
+
+# Stop after the core layer (no platform components).
+# coreOnly: true
+
+# Opt-in components to add: zot and rook (baremetal), falco, tetragon,
+# argocd-agent, argocd-agent-principal.
+enable:
+  - argocd-agent-principal # accept argocd-agent spokes from other clusters
+  - falco # runtime inspection
+
+# Optional components to remove: any platform component, longhorn, local-path-provisioner.
+# disable: [kargo]
+
+# Your own default StorageClass; baremetal only, with longhorn and local-path-provisioner
+# both disabled and rook not enabled.
+# defaultStorageClass: nfs
+
+# Address in lbIpPool for zot's LoadBalancer; nodes mirror registries through it (with zot).
+# pullThroughCacheIp: 10.10.0.5
+
+# Where the hub's argocd-agent-principal listens (with argocd-agent).
+# argocdAgent:
+#   principalAddress: agent.hub.example.com
+#   principalPort: 443
+
+# 1Password references read by bootstrap with `op read`; never secret values.
+secretRefs:
+  # Connect credentials and operator token (always required).
+  onepasswordCredentials: op://infra/eks-connect/credentials
+  onepasswordToken: op://infra/eks-connect/token
+
+  # Kargo admin login (unless kargo is disabled).
+  kargoAdminPasswordHash: op://infra/eks-kargo/password-hash
+  kargoTokenSigningKey: op://infra/eks-kargo/signing-key
+
+  # Cloudflare token for external-dns (baremetal, with a domain).
+  # cloudflareApiToken: op://infra/eks/cloudflareApiToken
+
+  # DigitalOcean token for external-dns (doks, with a domain).
+  # digitaloceanToken: op://infra/eks/digitaloceanToken
+
+  # GitHub token for kubechecks PR comments (with a domain, unless kubechecks is disabled).
+  githubToken: op://infra/kubechecks/github-token
+
+  # argocd-agent mTLS: shared CA plus this cluster's cert and key (with either agent role).
+  argocdAgentCa: op://infra/argocd-agent/ca
+  argocdAgentCert: op://infra/argocd-agent-principal/cert
+  argocdAgentKey: op://infra/argocd-agent-principal/key
+
+  # JWT signing key (with argocd-agent-principal).
+  argocdAgentJwtKey: op://infra/argocd-agent-principal/jwt-key
