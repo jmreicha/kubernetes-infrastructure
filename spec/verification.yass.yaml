@@ -18,6 +18,7 @@ INPUT:
   - MUST: "accept one fixture values file per provider, `tests/clusters/eks.yaml` and `tests/clusters/baremetal.yaml`, each with a domain set and nothing disabled"
     CONFORMS: ./values@ClusterValues::INPUT
   - MUST: "accept one further fixture per provider with no domain and every platform-layer Application disabled, `tests/clusters/<provider>-minimal.yaml`; the baremetal one also disables longhorn, so local-path-provisioner is exercised"
+  - MUST: "accept `tests/clusters/baremetal-rook.yaml`, the baremetal minimal fixture with rook enabled in place of longhorn"
   - MUST: run on every pull request, including Renovate pull requests that change a pinned version
 RETURN:
   - MUST: pass only when every check of both tiers passes for every fixture

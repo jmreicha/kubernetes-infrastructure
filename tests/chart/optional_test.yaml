@@ -30,3 +30,55 @@ tests:
     set: { layer: core, disable: [longhorn] }
     asserts:
       - notEqual: { path: metadata.name, value: longhorn }
+  - it: runtime inspection is off by default on every provider
+    values: [../clusters/eks-minimal.yaml]
+    set: { layer: core }
+    asserts:
+      - notEqual: { path: metadata.name, value: falco }
+      - notEqual: { path: metadata.name, value: tetragon }
+  - it: enabling tetragon renders it in kube-system
+    values: [../clusters/eks-minimal.yaml]
+    set: { layer: core, enable: [tetragon] }
+    documentSelector: { path: metadata.name, value: tetragon }
+    asserts:
+      - equal: { path: spec.destination.namespace, value: kube-system }
+  - it: enabling falco renders it with the modern eBPF driver
+    values: [../clusters/eks-minimal.yaml]
+    set: { layer: core, enable: [falco] }
+    documentSelector: { path: metadata.name, value: falco }
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.driver.kind, value: modern_ebpf }
+  - it: rook is off by default
+    values: [../clusters/baremetal.yaml]
+    set: { layer: core }
+    asserts:
+      - notEqual: { path: metadata.name, value: rook }
+      - notEqual: { path: metadata.name, value: rook-ceph-cluster }
+  - it: enabling rook renders a block-only Ceph cluster (the chart's block pool is the default class)
+    values: [../clusters/baremetal-rook.yaml]
+    set: { layer: core }
+    documentSelector: { path: metadata.name, value: rook-ceph-cluster }
+    asserts:
+      - equal: { path: spec.destination.namespace, value: rook-ceph }
+      - equal: { path: spec.source.helm.valuesObject.cephFileSystems, value: [] }
+      - equal: { path: spec.source.helm.valuesObject.cephObjectStores, value: [] }
+  - it: enabling rook renders the operator in rook-ceph
+    values: [../clusters/baremetal-rook.yaml]
+    set: { layer: core }
+    documentSelector: { path: metadata.name, value: rook }
+    asserts:
+      - equal: { path: spec.source.chart, value: rook-ceph }
+      - equal: { path: spec.destination.namespace, value: rook-ceph }
+  - it: with rook, local-path-provisioner is not installed in longhorn's place
+    values: [../clusters/baremetal-rook.yaml]
+    set: { layer: core }
+    asserts:
+      - notEqual: { path: metadata.name, value: local-path-provisioner }
+  - it: rook-ceph is a privileged namespace
+    values: [../clusters/baremetal-rook.yaml]
+    set: { layer: core }
+    documentSelector: { path: metadata.name, value: rook }
+    asserts:
+      - equal:
+          path: 'spec.syncPolicy.managedNamespaceMetadata.labels["pod-security.kubernetes.io/enforce"]'
+          value: privileged

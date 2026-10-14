@@ -38,7 +38,7 @@ INPUT:
   - MAY: "carry `enable`, a list of catalog entries marked `optIn`, which are installed only when listed here"
   - WHEN: zot is enabled
     MUST: "carry `pullThroughCacheIp`, an address in `lbIpPool` that the zot LoadBalancer Service takes and nodes use as their registry mirror"
-  - WHEN: provider is baremetal and both longhorn and local-path-provisioner are disabled
+  - WHEN: provider is baremetal, both longhorn and local-path-provisioner are disabled, and rook is not enabled
     MUST: "carry `defaultStorageClass`, the name of a StorageClass provided outside this project"
   - WHEN: "`disable` or `enable` names an entry that the catalog does not offer for this provider"
     MUST: accept it as having no effect
@@ -55,7 +55,9 @@ ERROR:
     MUST: be rejected
   - WHEN: provider is eks and zot is enabled
     MUST: be rejected, pointing to an ECR pull-through cache configured outside the cluster
-  - WHEN: "`defaultStorageClass` is present while longhorn or local-path-provisioner is not disabled, or provider is eks"
+  - WHEN: provider is baremetal, rook is enabled, and longhorn is not disabled
+    MUST: be rejected, asking for longhorn to be disabled, because Ceph's StorageClass replaces Longhorn's as the default
+  - WHEN: "`defaultStorageClass` is present while longhorn or local-path-provisioner is not disabled, rook is enabled, or provider is not baremetal"
     MUST: be rejected, because the cluster would have two candidate default StorageClasses
   - WHEN: clusterName does not equal the file name stem
     MUST: be rejected, naming both values

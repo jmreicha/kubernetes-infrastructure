@@ -4,6 +4,7 @@ kubernetesVersion: "1.34"
 domain: do.example.com
 enable:
   - argocd-agent
+  - tetragon
 argocdAgent:
   principalAddress: agent.hub.example.com
   principalPort: 443

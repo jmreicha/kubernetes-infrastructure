@@ -181,3 +181,25 @@ test_agent_settings_without_agent_denied if {
 	some m in values.deny with data.catalog as agent_catalog with input as inp
 	contains(m, "argocdAgent")
 }
+
+rook_catalog := array.concat(catalog, [{"name": "rook", "layer": "core", "optIn": true, "providers": ["baremetal"]}])
+
+rook_bm := object.union(base_bm, {"enable": ["rook"], "disable": ["longhorn"]})
+
+test_rook_with_longhorn_disabled_passes if count(values.deny) == 0 with data.catalog as rook_catalog with input as rook_bm
+
+test_rook_requires_longhorn_disabled if {
+	some m in values.deny with data.catalog as rook_catalog with input as object.union(base_bm, {"enable": ["rook"]})
+	contains(m, "longhorn")
+}
+
+test_rook_needs_no_default_sc if {
+	count(values.deny) == 0 with data.catalog as rook_catalog with input as object.union(rook_bm, {"disable": ["longhorn", "local-path-provisioner"]})
+}
+
+test_default_sc_with_rook_denied if {
+	some m in values.deny with data.catalog as rook_catalog with input as object.union(rook_bm, {"disable": ["longhorn", "local-path-provisioner"], "defaultStorageClass": "nfs"})
+	contains(m, "defaultStorageClass")
+}
+
+test_rook_on_eks_has_no_effect if count(values.deny) == 0 with data.catalog as rook_catalog with input as object.union(base_eks, {"enable": ["rook"]})

@@ -11,7 +11,7 @@ spec: Security
 INPUT:
   - CONFORMS: ./values@ClusterValues::INPUT
   - MUST: "treat a namespace as managed when it is the destination of a rendered catalog Application"
-  - MUST: "treat `kube-system`, `falco`, `longhorn-system`, `local-path-storage`, `kubevirt`, and `cdi` as the privileged namespaces, because their workloads need host access"
+  - MUST: "treat `kube-system`, `falco`, `longhorn-system`, `rook-ceph`, `local-path-storage`, `kubevirt`, and `cdi` as the privileged namespaces, because their workloads need host access"
   - WHEN: provider is eks
     MUST: rely on EKS envelope encryption of Secrets with a KMS key, configured outside the cluster
   - WHEN: provider is baremetal

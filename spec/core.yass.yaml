@@ -22,14 +22,17 @@ SIDE-EFFECT:
   - MUST: render no Application for any other catalog entry
   - MUST: "install cert-manager with its CRDs (`crds.enabled=true`)"
   - MUST: install Gatekeeper with its controller and audit enabled and no constraints
-  - MUST: install Falco with its default ruleset and the modern eBPF driver
+  - WHEN: falco is enabled
+    MUST: install Falco with its default ruleset and the modern eBPF driver
+  - WHEN: tetragon is enabled
+    MUST: install Tetragon in kube-system with its default configuration and no TracingPolicies
   - MUST: install the OpenTelemetry operator with no OpenTelemetryCollector resources
 ERROR:
   - WHEN: any core Application is not Synced and Healthy 30 minutes after the core root Application is applied
     MUST: fail, naming every Application that is Degraded, OutOfSync, Missing, or Progressing
   - MUST: fail, report the failure, and leave the cluster as it stands
 INVARIANT:
-  - MUST-NOT: install configuration objects such as ClusterIssuers, ClusterSecretStores, Karpenter NodePools, or Falco custom rules, other than the security baseline
+  - MUST-NOT: install configuration objects such as ClusterIssuers, ClusterSecretStores, Karpenter NodePools, Falco custom rules, or Tetragon TracingPolicies, other than the security baseline
     SEE: ./security@Security
 ---
 spec: Core.Eks
@@ -57,9 +60,11 @@ INPUT:
   - CONFORMS: Core::INPUT
   - WHEN: longhorn is not disabled
     MUST: "rely on every node carrying the Talos `iscsi-tools` and `util-linux-tools` system extensions and the Longhorn kubelet extraMounts"
-  - WHEN: longhorn is disabled and local-path-provisioner is not
+  - WHEN: rook is enabled
+    MUST: rely on at least three nodes carrying an unused raw block device, which Ceph claims for its OSDs
+  - WHEN: longhorn is disabled, rook is not enabled, and local-path-provisioner is not disabled
     MUST: "rely on every node's Talos machine config making `/var/local-path-provisioner` writable to the provisioner"
-  - WHEN: longhorn and local-path-provisioner are both disabled
+  - WHEN: longhorn and local-path-provisioner are both disabled and rook is not enabled
     MUST: "rely on the StorageClass named by `defaultStorageClass` existing and being provided outside this project"
 RETURN:
   - CONFORMS: Core::RETURN
@@ -67,9 +72,11 @@ SIDE-EFFECT:
   - CONFORMS: Core::SIDE-EFFECT
   - WHEN: longhorn is not disabled
     MUST: install Longhorn with its StorageClass marked default, and render no local-path-provisioner Application
-  - WHEN: longhorn is disabled and local-path-provisioner is not
+  - WHEN: rook is enabled
+    MUST: "install the Rook operator and a Ceph cluster over every node and unused device, with only the `ceph-block` RBD pool, whose StorageClass is marked default, and no CephFS or object store; render no local-path-provisioner Application"
+  - WHEN: longhorn is disabled, rook is not enabled, and local-path-provisioner is not disabled
     MUST: install local-path-provisioner with its StorageClass marked default
-  - WHEN: longhorn and local-path-provisioner are both disabled
+  - WHEN: longhorn and local-path-provisioner are both disabled and rook is not enabled
     MUST: install no StorageClass, and mark no StorageClass default
   - WHEN: the cluster values carry a domain
     MUST: configure external-dns with the cloudflare provider, domainFilters set to domain, and policy sync, reading the API token from the Secret seeded by SecretSeed
@@ -86,6 +93,8 @@ SIDE-EFFECT:
 ERROR:
   - WHEN: a node lacks the Talos extensions Longhorn needs
     MUST: fail through Core ERROR, with longhorn named as Degraded
+  - WHEN: rook is enabled and Ceph cannot place three OSDs
+    MUST: fail through Core ERROR, with rook-ceph-cluster named as not Healthy
   - WHEN: "the StorageClass named by `defaultStorageClass` does not exist, or is not the only StorageClass annotated as default, when bootstrap starts"
     MUST: fail the bootstrap layer before anything is installed, naming the StorageClass, because it is provided outside this project
   - CONFORMS: Core::ERROR
@@ -103,7 +112,8 @@ SIDE-EFFECT:
   - WHEN: the cluster values carry a domain
     MUST: configure external-dns with the digitalocean provider, domainFilters set to domain, and policy sync, reading the API token from the Secret seeded by SecretSeed
     SEE: ./bootstrap@SecretSeed
-  - MUST: "label the falco namespace `pod-security.kubernetes.io/enforce=privileged`"
+  - WHEN: falco is enabled
+    MUST: "label the falco namespace `pod-security.kubernetes.io/enforce=privileged`"
 ERROR:
   - WHEN: "`do-block-storage` is not the only default StorageClass when bootstrap starts"
     MUST: fail the bootstrap layer before anything is installed, naming the default StorageClasses found

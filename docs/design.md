@@ -46,11 +46,11 @@ How the boundary is enforced:
 
 Optionality works the same way in every layer. Each catalog entry is one of:
 
-| Kind     | Default       | Cluster values               | Entries                                                        |
-| -------- | ------------- | ---------------------------- | -------------------------------------------------------------- |
-| Required | Installed     | Can't be turned off          | Everything not listed below                                    |
-| Optional | Installed     | `disable: [name]` removes it | Every platform component, `longhorn`, `local-path-provisioner` |
-| Opt-in   | Not installed | `enable: [name]` adds it     | `zot` (bare metal pull-through cache)                          |
+| Kind     | Default       | Cluster values               | Entries                                                                                                                        |
+| -------- | ------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Required | Installed     | Can't be turned off          | Everything not listed below                                                                                                    |
+| Optional | Installed     | `disable: [name]` removes it | Every platform component, `longhorn`, `local-path-provisioner`                                                                 |
+| Opt-in   | Not installed | `enable: [name]` adds it     | `zot` (bare metal pull-through cache), `rook` (bare metal Ceph), `falco`, `tetragon`, `argocd-agent`, `argocd-agent-principal` |
 
 Naming anything else in either list is rejected. A name the provider doesn't offer, such as
 `kubevirt` on EKS, is accepted and does nothing.
@@ -59,7 +59,11 @@ Naming anything else in either list is rejected. A name the provider doesn't off
   local-path-provisioner becomes the default StorageClass instead (node-local, no
   replication). With both disabled, `defaultStorageClass` names one you provide, and
   bootstrap checks it exists and is the only default. Either way, core still guarantees
-  exactly one default StorageClass to the platform layer.
+  exactly one default StorageClass to the platform layer. `enable: [rook]` runs Rook Ceph
+  (block pool only, three-way replicated, over every unused node device) as the default
+  instead; it requires `disable: [longhorn]`.
+- **Runtime inspection.** Falco and Tetragon are opt-in on every provider; neither is
+  installed unless named in `enable`.
 - **Pull-through cache.** `enable: [zot]` with `pullThroughCacheIp` (an address in
   `lbIpPool`) runs zot as an on-demand mirror of Docker Hub, ghcr.io, quay.io,
   registry.k8s.io, public.ecr.aws, and gcr.io. `scripts/talos-registry-patch` renders the
@@ -93,7 +97,7 @@ and head trees; see `spec/verification`.
 | 11  | Secrets seeded by bootstrap with `op read`; values carry only op:// refs                                                                                                 | Nothing secret in git; one secret source                                                                                      | ESO ClusterSecretStore (counts as config)                                                                                  |
 | 12  | EKS IAM via Pod Identity, created outside the cluster                                                                                                                    | No role ARNs in chart values                                                                                                  | IRSA annotations                                                                                                           |
 | 13  | Crossplane, not ACK or kro                                                                                                                                               | One control plane on both providers                                                                                           | ACK + kro; both with split ownership                                                                                       |
-| 14  | Falco for runtime security                                                                                                                                               | Useful default ruleset on day one                                                                                             | Tetragon (needs authored policies); revisit for enforcement                                                                |
+| 14  | Falco and Tetragon for runtime inspection, both opt-in                                                                                                                   | Not every cluster wants the overhead; Falco has useful rules on day one, Tetragon needs authored TracingPolicies              | Always-on Falco                                                                                                            |
 | 15  | Gatekeeper for admission policy, no constraints in v1                                                                                                                    | Requested; constraints are config                                                                                             |                                                                                                                            |
 | 16  | Talos for bare metal                                                                                                                                                     | Immutable; handles reboots and upgrades itself, so no kured                                                                   | k3s, RKE2, kubeadm                                                                                                         |
 | 17  | Longhorn in core on bare metal, optional                                                                                                                                 | Default StorageClass there; peer of EBS CSI                                                                                   | Platform layer                                                                                                             |
@@ -140,6 +144,7 @@ and head trees; see `spec/verification`.
 | 58  | doks uses DigitalOcean's managed Gateway API, not Envoy Gateway                                                                                                          | DO owns the Gateway API CRDs there; two owners would fight                                                                    | Envoy Gateway without CRDs                                                                                                 |
 | 59  | No CiliumNetworkPolicies on doks for now                                                                                                                                 | DO-managed Cilium can't run audit mode, so they'd enforce untested                                                            | Enforce default-deny on doks                                                                                               |
 | 60  | argocd-agent (agent and principal) as opt-in core components, autonomous mode, mTLS from 1Password                                                                       | Central visibility while each cluster keeps its own Argo CD; workload clusters dial out, the hub holds no cluster credentials | Hub-managed Argo CD; agent only                                                                                            |
+| 61  | Rook Ceph as an opt-in alternative to Longhorn on bare metal, block pool only                                                                                            | Replicated block storage on raw disks; one default StorageClass, so enabling rook requires disabling longhorn                 | Running both; CephFS and object store by default                                                                           |
 
 ## Known gaps
 

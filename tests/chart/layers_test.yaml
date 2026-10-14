@@ -113,12 +113,12 @@ tests:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: reloader, any: true }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: strimzi, any: true }
-  - it: eks-minimal core layer renders exactly 15 Applications
+  - it: eks-minimal core layer renders exactly 14 Applications
     values: [../clusters/eks-minimal.yaml]
     set:
       layer: core
     asserts:
-      - hasDocuments: { count: 15 }
+      - hasDocuments: { count: 14 }
       - containsDocument:
           {
             kind: Application,
@@ -154,8 +154,6 @@ tests:
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: external-secrets, any: true }
       - containsDocument:
-          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: falco, any: true }
-      - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: gatekeeper, any: true }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: karpenter, any: true }
@@ -190,12 +188,12 @@ tests:
       layer: platform
     asserts:
       - hasDocuments: { count: 0 }
-  - it: baremetal core layer renders exactly 15 Applications
+  - it: baremetal core layer renders exactly 14 Applications
     values: [../clusters/baremetal.yaml]
     set:
       layer: core
     asserts:
-      - hasDocuments: { count: 15 }
+      - hasDocuments: { count: 14 }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: zot, any: true }
       - containsDocument:
@@ -220,8 +218,6 @@ tests:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: external-dns, any: true }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: external-secrets, any: true }
-      - containsDocument:
-          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: falco, any: true }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: gatekeeper, any: true }
       - containsDocument:
@@ -286,12 +282,12 @@ tests:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: reloader, any: true }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: strimzi, any: true }
-  - it: baremetal-minimal core layer renders exactly 13 Applications
+  - it: baremetal-minimal core layer renders exactly 12 Applications
     values: [../clusters/baremetal-minimal.yaml]
     set:
       layer: core
     asserts:
-      - hasDocuments: { count: 13 }
+      - hasDocuments: { count: 12 }
       - containsDocument:
           {
             kind: Application,
@@ -312,8 +308,6 @@ tests:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: envoy-gateway, any: true }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: external-secrets, any: true }
-      - containsDocument:
-          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: falco, any: true }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: gatekeeper, any: true }
       - containsDocument:
@@ -429,7 +423,7 @@ tests:
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: external-secrets, any: true }
       - containsDocument:
-          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: falco, any: true }
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: tetragon, any: true }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: gatekeeper, any: true }
       - containsDocument:

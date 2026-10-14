@@ -77,7 +77,8 @@ Remove the inline manifest afterwards so `talosctl upgrade-k8s` can't roll back 
 
 - **Turn components on or off** per cluster, the same way in every layer: `disable: [name]`
   removes an optional component, `enable: [name]` adds an opt-in one. On bare metal,
-  `disable: [longhorn]` switches storage to local-path-provisioner.
+  `disable: [longhorn]` switches storage to local-path-provisioner, or add `enable: [rook]`
+  for Rook Ceph. Falco and Tetragon are off unless named in `enable`.
 - **Argo CD agent:** `enable: [argocd-agent]` with `argocdAgent.principalAddress` reports a
   cluster's Argo CD to a hub; the hub sets `enable: [argocd-agent-principal]`. Certificates are
   `op://` references.

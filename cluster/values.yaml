@@ -32,7 +32,8 @@ pullThroughCacheRegistries:
   gcr.io: https://gcr.io
 
 # Namespaces whose workloads need host access (spec/security); all others enforce baseline.
-privilegedNamespaces: [kube-system, falco, longhorn-system, local-path-storage, kubevirt, cdi]
+privilegedNamespaces:
+  [kube-system, falco, longhorn-system, rook-ceph, local-path-storage, kubevirt, cdi]
 
 # Cluster-scoped kinds the platform AppProject may create.
 platformClusterKinds:
@@ -244,6 +245,31 @@ catalog:
       preUpgradeChecker:
         jobEnabled: false
 
+  # Rook Ceph replaces Longhorn (values policy requires longhorn disabled); enable: [rook] adds both.
+  - name: rook
+    chart: rook-ceph
+    repoURL: https://charts.rook.io/release
+    version: v1.21.0
+    namespace: rook-ceph
+    layer: core
+    optIn: true
+    providers: [baremetal]
+    wave: 1
+
+  - name: rook-ceph-cluster
+    chart: rook-ceph-cluster
+    repoURL: https://charts.rook.io/release
+    version: v1.21.0
+    namespace: rook-ceph
+    layer: core
+    providers: [baremetal]
+    wave: 2
+    when: '{{ has "rook" .Values.enable }}'
+    values: |
+      # Block only; the chart's ceph-block pool is the default StorageClass.
+      cephFileSystems: []
+      cephObjectStores: []
+
   - name: local-path-provisioner
     path: deploy/chart/local-path-provisioner
     repoURL: https://github.com/rancher/local-path-provisioner.git
@@ -253,7 +279,7 @@ catalog:
     optional: true
     providers: [baremetal]
     wave: 1
-    when: '{{ has "longhorn" .Values.disable }}'
+    when: '{{ and (has "longhorn" .Values.disable) (not (has "rook" .Values.enable)) }}'
     values: |
       storageClass:
         defaultClass: true
@@ -405,11 +431,22 @@ catalog:
     version: 9.2.0
     namespace: falco
     layer: core
+    optIn: true
     providers: [eks, baremetal, doks]
     wave: 2
     values: |
       driver:
         kind: modern_ebpf
+
+  - name: tetragon
+    chart: tetragon
+    repoURL: https://helm.cilium.io
+    version: 1.7.1
+    namespace: kube-system
+    layer: core
+    optIn: true
+    providers: [eks, baremetal, doks]
+    wave: 2
 
   - name: metrics-server
     chart: metrics-server

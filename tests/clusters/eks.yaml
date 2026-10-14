@@ -18,3 +18,4 @@ secretRefs:
   argocdAgentJwtKey: op://infra/argocd-agent-principal/jwt-key
 enable:
   - argocd-agent-principal
+  - falco

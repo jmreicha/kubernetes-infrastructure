@@ -63,6 +63,7 @@ required contains "pullThroughCacheIp" if "zot" in enabled_opt_ins
 
 required contains "defaultStorageClass" if {
 	input.provider == "baremetal"
+	not "rook" in enabled_opt_ins
 	{"longhorn", "local-path-provisioner"} & disabled == {"longhorn", "local-path-provisioner"}
 }
 
@@ -137,7 +138,7 @@ deny contains sprintf("disable: %s cannot be disabled; allowed: %v", [d, sort(di
 	not d in disableable
 }
 
-deny contains "defaultStorageClass is only allowed on baremetal with longhorn and local-path-provisioner both disabled" if {
+deny contains "defaultStorageClass is only allowed on baremetal without longhorn, local-path-provisioner, or rook" if {
 	input.defaultStorageClass
 	not "defaultStorageClass" in required
 }
@@ -145,6 +146,12 @@ deny contains "defaultStorageClass is only allowed on baremetal with longhorn an
 deny contains sprintf("enable: %s is not opt-in; allowed: %v", [e, sort(enableable)]) if {
 	some e in enabled_opt_ins
 	not e in enableable
+}
+
+deny contains "rook replaces longhorn as the default StorageClass; add longhorn to disable" if {
+	input.provider == "baremetal"
+	"rook" in enabled_opt_ins
+	enabled("longhorn")
 }
 
 deny contains "pullThroughCacheIp is only allowed when zot is enabled" if {
