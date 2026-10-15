@@ -46,11 +46,11 @@ How the boundary is enforced:
 
 Optionality works the same way in every layer. Each catalog entry is one of:
 
-| Kind     | Default       | Cluster values               | Entries                                                                                                                        |
-| -------- | ------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Required | Installed     | Can't be turned off          | Everything not listed below                                                                                                    |
-| Optional | Installed     | `disable: [name]` removes it | Every platform component, `longhorn`, `local-path-provisioner`                                                                 |
-| Opt-in   | Not installed | `enable: [name]` adds it     | `zot` (bare metal pull-through cache), `rook` (bare metal Ceph), `falco`, `tetragon`, `argocd-agent`, `argocd-agent-principal` |
+| Kind     | Default       | Cluster values               | Entries                                                                                                                                                                 |
+| -------- | ------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Required | Installed     | Can't be turned off          | Everything not listed below                                                                                                                                             |
+| Optional | Installed     | `disable: [name]` removes it | Every platform component except the identity add-ons, `longhorn`, `local-path-provisioner`                                                                              |
+| Opt-in   | Not installed | `enable: [name]` adds it     | `zot` (bare metal pull-through cache), `rook` (bare metal Ceph), `falco`, `tetragon`, `argocd-agent`, `argocd-agent-principal`, `authentik`, `keycloak`, `oauth2-proxy` |
 
 Naming anything else in either list is rejected. A name the provider doesn't offer, such as
 `kubevirt` on EKS, is accepted and does nothing.
@@ -62,6 +62,10 @@ Naming anything else in either list is rejected. A name the provider doesn't off
   exactly one default StorageClass to the platform layer. `enable: [rook]` runs Rook Ceph
   (block pool only, three-way replicated, over every unused node device) as the default
   instead; it requires `disable: [longhorn]`.
+- **Identity.** `authentik`, `keycloak`, and `oauth2-proxy` are opt-in platform add-ons.
+  Authentik and Keycloak use an external Postgres (`<name>.postgresHost`); oauth2-proxy signs
+  in through `oauth2Proxy.issuerUrl`. Secrets come from 1Password. None is exposed or configured
+  beyond install; add routes, realms, and clients per cluster.
 - **Runtime inspection.** Falco and Tetragon are opt-in on every provider; neither is
   installed unless named in `enable`.
 - **Pull-through cache.** `enable: [zot]` with `pullThroughCacheIp` (an address in
@@ -145,6 +149,7 @@ and head trees; see `spec/verification`.
 | 59  | No CiliumNetworkPolicies on doks for now                                                                                                                                 | DO-managed Cilium can't run audit mode, so they'd enforce untested                                                            | Enforce default-deny on doks                                                                                               |
 | 60  | argocd-agent (agent and principal) as opt-in core components, autonomous mode, mTLS from 1Password                                                                       | Central visibility while each cluster keeps its own Argo CD; workload clusters dial out, the hub holds no cluster credentials | Hub-managed Argo CD; agent only                                                                                            |
 | 61  | Rook Ceph as an opt-in alternative to Longhorn on bare metal, block pool only                                                                                            | Replicated block storage on raw disks; one default StorageClass, so enabling rook requires disabling longhorn                 | Running both; CephFS and object store by default                                                                           |
+| 62  | Authentik, Keycloak, and oauth2-proxy as opt-in platform add-ons; external Postgres; no routes                                                                           | Pick an IdP per cluster; databases stay with whatever runs them (RDS, DO Managed DB, OpenEverest)                             | Bundled Bitnami Postgres; OpenEverest-provisioned databases; routes under `domain`                                         |
 
 ## Known gaps
 

@@ -18,7 +18,7 @@ source "$BATS_TEST_DIRNAME/bootstrap_helpers.bash"
 @test "seeds every secret the cluster needs" {
   run scripts/bootstrap-cluster "$work/clusters/baremetal.yaml"
   [ "$status" -eq 0 ]
-  for s in op-credentials onepassword-token kargo-admin cloudflare-api-token kubechecks-tokens; do
+  for s in op-credentials onepassword-token kargo-admin cloudflare-api-token kubechecks-tokens keycloak; do
     grep -q "name: $s" "$APPLIED" || {
       echo "missing $s"
       return 1
@@ -34,11 +34,20 @@ source "$BATS_TEST_DIRNAME/bootstrap_helpers.bash"
 }
 
 @test "existing secrets are left alone on a re-run" {
-  STUB_EXISTING_SECRETS="op-credentials onepassword-token kargo-admin cloudflare-api-token kubechecks-tokens" \
+  STUB_EXISTING_SECRETS="op-credentials onepassword-token kargo-admin cloudflare-api-token kubechecks-tokens keycloak" \
     run scripts/bootstrap-cluster "$work/clusters/baremetal.yaml"
   [ "$status" -eq 0 ]
   refute grep -q '^op read' "$CALLS"
   refute grep -q 'exec' "$CALLS"
+}
+
+@test "seeds each enabled identity add-on's secret and no others" {
+  run scripts/bootstrap-cluster "$work/clusters/eks.yaml"
+  [ "$status" -eq 0 ]
+  secrets=$(yq 'select(.kind == "Secret") | .metadata.name' "$APPLIED")
+  grep -qx authentik <<<"$secrets"
+  grep -qx oauth2-proxy <<<"$secrets"
+  refute grep -q keycloak <<<"$secrets"
 }
 
 @test "eks: removes the VPC CNI and skips the cloudflare secret" {

@@ -82,12 +82,16 @@ tests:
             name: opentelemetry-operator,
             any: true,
           }
-  - it: eks platform layer renders exactly 10 Applications
+  - it: eks platform layer renders exactly 12 Applications
     values: [../../examples/eks.yaml]
     set:
       layer: platform
     asserts:
-      - hasDocuments: { count: 10 }
+      - hasDocuments: { count: 12 }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: authentik, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: oauth2-proxy, any: true }
       - containsDocument:
           {
             kind: Application,
@@ -247,12 +251,14 @@ tests:
             name: opentelemetry-operator,
             any: true,
           }
-  - it: baremetal platform layer renders exactly 12 Applications
+  - it: baremetal platform layer renders exactly 13 Applications
     values: [../../examples/baremetal.yaml]
     set:
       layer: platform
     asserts:
-      - hasDocuments: { count: 12 }
+      - hasDocuments: { count: 13 }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: keycloak, any: true }
       - containsDocument:
           {
             kind: Application,
@@ -355,7 +361,7 @@ tests:
     values: [../../examples/baremetal.yaml]
     set: { layer: platform, disable: [kubevirt] }
     asserts:
-      - hasDocuments: { count: 10 }
+      - hasDocuments: { count: 11 }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: strimzi, any: true }
   - it: an unknown layer fails rendering

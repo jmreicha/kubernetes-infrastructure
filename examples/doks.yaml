@@ -29,7 +29,7 @@ domain: do.example.com
 # coreOnly: true
 
 # Opt-in components to add: zot and rook (baremetal), falco, tetragon,
-# argocd-agent, argocd-agent-principal.
+# argocd-agent, argocd-agent-principal, authentik, keycloak, oauth2-proxy.
 enable:
   - argocd-agent # report this cluster's Argo CD to a hub; needs argocdAgent
   - tetragon # runtime inspection
@@ -48,6 +48,20 @@ enable:
 argocdAgent:
   principalAddress: agent.hub.example.com
   principalPort: 443
+
+# External Postgres for Authentik (with authentik); database and user are both authentik.
+# postgresPort defaults to 5432.
+# authentik:
+#   postgresHost: postgres.example.com
+
+# External Postgres for Keycloak (with keycloak); database and user are both keycloak.
+# postgresPort defaults to 5432.
+# keycloak:
+#   postgresHost: postgres.example.com
+
+# OIDC issuer oauth2-proxy signs users in with (with oauth2-proxy).
+# oauth2Proxy:
+#   issuerUrl: https://auth.example.com/application/o/oauth2-proxy/
 
 # 1Password references read by bootstrap with `op read`; never secret values.
 secretRefs:
@@ -75,3 +89,16 @@ secretRefs:
 
   # JWT signing key (with argocd-agent-principal).
   # argocdAgentJwtKey: op://infra/doks/argocdAgentJwtKey
+
+  # Authentik secret key and Postgres password (with authentik).
+  # authentikSecretKey: op://infra/doks/authentikSecretKey
+  # authentikPostgresPassword: op://infra/doks/authentikPostgresPassword
+
+  # Keycloak admin and Postgres passwords (with keycloak).
+  # keycloakAdminPassword: op://infra/doks/keycloakAdminPassword
+  # keycloakPostgresPassword: op://infra/doks/keycloakPostgresPassword
+
+  # oauth2-proxy OIDC client and cookie secret (with oauth2-proxy).
+  # oauth2ProxyClientId: op://infra/doks/oauth2ProxyClientId
+  # oauth2ProxyClientSecret: op://infra/doks/oauth2ProxyClientSecret
+  # oauth2ProxyCookieSecret: op://infra/doks/oauth2ProxyCookieSecret

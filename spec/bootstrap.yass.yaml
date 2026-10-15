@@ -70,6 +70,12 @@ RETURN:
     MUST: "yield, in namespace `argocd`, the CA Secret `argocd-agent-ca` and the client certificate Secret `argocd-agent-client-tls`"
   - WHEN: argocd-agent-principal is enabled
     MUST: "yield, in namespace `argocd`, the CA Secret `argocd-agent-ca`, the server certificate Secrets `argocd-agent-principal-tls`, `argocd-agent-resource-proxy-tls`, and `argocd-redis-proxy-tls`, and the JWT key Secret `argocd-agent-jwt`"
+  - WHEN: authentik is enabled
+    MUST: "yield, in namespace `authentik`, the Secret `authentik` holding the Authentik secret key and Postgres password"
+  - WHEN: keycloak is enabled
+    MUST: "yield, in namespace `keycloak`, the Secret `keycloak` holding the Keycloak bootstrap admin password and Postgres password"
+  - WHEN: oauth2-proxy is enabled
+    MUST: "yield, in namespace `oauth2-proxy`, the Secret `oauth2-proxy` holding the OIDC client id, client secret, and cookie secret"
   - WHEN: the cluster values carry a domain and kubechecks is not disabled
     MUST: "yield, in namespace `kubechecks`, a Secret holding the GitHub token read with `op read` and an Argo CD API token for a local `kubechecks` account, generated once Argo CD is running"
 SIDE-EFFECT:

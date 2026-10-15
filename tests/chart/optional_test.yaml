@@ -82,3 +82,52 @@ tests:
       - equal:
           path: 'spec.syncPolicy.managedNamespaceMetadata.labels["pod-security.kubernetes.io/enforce"]'
           value: privileged
+  - it: identity add-ons are off by default
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform }
+    asserts:
+      - notEqual: { path: metadata.name, value: authentik }
+      - notEqual: { path: metadata.name, value: keycloak }
+      - notEqual: { path: metadata.name, value: oauth2-proxy }
+  - it: authentik uses the seeded Secret and the external Postgres from cluster values
+    values: [../../examples/eks-minimal.yaml]
+    set:
+      layer: platform
+      enable: [authentik]
+      authentik: { postgresHost: db.example.com, postgresPort: 25060 }
+    documentSelector: { path: metadata.name, value: authentik }
+    asserts:
+      - equal: { path: spec.destination.namespace, value: authentik }
+      - equal:
+          {
+            path: spec.source.helm.valuesObject.authentik.existingSecret.secretName,
+            value: authentik,
+          }
+      - contains:
+          path: spec.source.helm.valuesObject.global.env
+          content: { name: AUTHENTIK_POSTGRESQL__HOST, value: db.example.com }
+      - contains:
+          path: spec.source.helm.valuesObject.global.env
+          content: { name: AUTHENTIK_POSTGRESQL__PORT, value: "25060" }
+  - it: keycloak uses the seeded Secret and the external Postgres from cluster values
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform, enable: [keycloak], keycloak: { postgresHost: db.example.com } }
+    documentSelector: { path: metadata.name, value: keycloak }
+    asserts:
+      - equal: { path: spec.source.chart, value: keycloakx }
+      - equal: { path: spec.source.helm.valuesObject.database.hostname, value: db.example.com }
+      - equal: { path: spec.source.helm.valuesObject.database.port, value: 5432 }
+      - equal: { path: spec.source.helm.valuesObject.database.existingSecret, value: keycloak }
+  - it: oauth2-proxy uses the OIDC issuer from cluster values and the seeded Secret
+    values: [../../examples/eks-minimal.yaml]
+    set:
+      layer: platform
+      enable: [oauth2-proxy]
+      oauth2Proxy: { issuerUrl: "https://auth.example.com/application/o/proxy/" }
+    documentSelector: { path: metadata.name, value: oauth2-proxy }
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.config.existingSecret, value: oauth2-proxy }
+      - equal: { path: spec.source.helm.valuesObject.extraArgs.provider, value: oidc }
+      - equal:
+          path: 'spec.source.helm.valuesObject.extraArgs["oidc-issuer-url"]'
+          value: https://auth.example.com/application/o/proxy/

@@ -110,6 +110,16 @@ enabled kargo && seed kargo kargo-admin \
 [ -n "$domain" ] && [ "$provider" = doks ] \
   && seed external-dns digitalocean-api-token "token=$(val .secretRefs.digitaloceanToken)"
 
+# Identity add-ons read these Secrets by name (cluster/values.yaml).
+opted_in authentik && seed authentik authentik \
+  "AUTHENTIK_SECRET_KEY=$(val .secretRefs.authentikSecretKey)" \
+  "AUTHENTIK_POSTGRESQL__PASSWORD=$(val .secretRefs.authentikPostgresPassword)"
+opted_in keycloak && seed keycloak keycloak \
+  "admin-password=$(val .secretRefs.keycloakAdminPassword)" "db-password=$(val .secretRefs.keycloakPostgresPassword)"
+opted_in oauth2-proxy && seed oauth2-proxy oauth2-proxy \
+  "client-id=$(val .secretRefs.oauth2ProxyClientId)" "client-secret=$(val .secretRefs.oauth2ProxyClientSecret)" \
+  "cookie-secret=$(val .secretRefs.oauth2ProxyCookieSecret)"
+
 # argocd-agent PKI (spec/bootstrap SecretSeed): the agent's client cert, or the principal's
 # server cert (also used by its resource and Redis proxies) and JWT key. Never generated.
 if opted_in argocd-agent || opted_in argocd-agent-principal; then

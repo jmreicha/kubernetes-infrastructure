@@ -203,3 +203,50 @@ test_default_sc_with_rook_denied if {
 }
 
 test_rook_on_eks_has_no_effect if count(values.deny) == 0 with data.catalog as rook_catalog with input as object.union(base_eks, {"enable": ["rook"]})
+
+id_catalog := array.concat(catalog, [
+	{"name": "authentik", "layer": "platform", "optIn": true}, {"name": "keycloak", "layer": "platform", "optIn": true},
+	{"name": "oauth2-proxy", "layer": "platform", "optIn": true},
+])
+
+id_refs := object.union(base_eks.secretRefs, {
+	"authentikSecretKey": "op://v/a/k", "authentikPostgresPassword": "op://v/a/p",
+	"keycloakAdminPassword": "op://v/k/a", "keycloakPostgresPassword": "op://v/k/p",
+	"oauth2ProxyClientId": "op://v/o/i", "oauth2ProxyClientSecret": "op://v/o/s", "oauth2ProxyCookieSecret": "op://v/o/c",
+})
+
+id_eks := object.union(base_eks, {
+	"enable": ["authentik", "keycloak", "oauth2-proxy"], "secretRefs": id_refs,
+	"authentik": {"postgresHost": "db"}, "keycloak": {"postgresHost": "db", "postgresPort": 25060},
+	"oauth2Proxy": {"issuerUrl": "https://auth.example.com/"},
+})
+
+test_identity_add_ons_pass if count(values.deny) == 0 with data.catalog as id_catalog with input as id_eks
+
+test_identity_needs_its_settings if {
+	d := values.deny with data.catalog as id_catalog with input as object.remove(id_eks, ["authentik", "keycloak", "oauth2Proxy"])
+	d["missing required key: authentik"]
+	d["missing required key: keycloak"]
+	d["missing required key: oauth2Proxy"]
+}
+
+test_identity_needs_its_secrets if {
+	d := values.deny with data.catalog as id_catalog with input as object.union(object.remove(id_eks, ["secretRefs"]), {"secretRefs": base_eks.secretRefs})
+	d["missing required key: secretRefs.authentikPostgresPassword"]
+	d["missing required key: secretRefs.keycloakAdminPassword"]
+	d["missing required key: secretRefs.oauth2ProxyCookieSecret"]
+}
+
+test_identity_settings_without_enable_denied if {
+	d := values.deny with data.catalog as id_catalog with input as object.union(id_eks, {"enable": []})
+	some m in d
+	contains(m, "authentik is only allowed")
+}
+
+test_identity_settings_shape_checked if {
+	d := values.deny with data.catalog as id_catalog with input as object.union(object.remove(id_eks, ["keycloak", "oauth2Proxy"]), {"keycloak": {"postgresPort": "5432"}, "oauth2Proxy": {}})
+	some k in d
+	contains(k, "keycloak needs")
+	some o in d
+	contains(o, "oauth2Proxy needs")
+}

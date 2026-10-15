@@ -8,12 +8,14 @@ secret_keys := {
 	"onepasswordCredentials", "onepasswordToken", "kargoAdminPasswordHash",
 	"kargoTokenSigningKey", "cloudflareApiToken", "githubToken", "digitaloceanToken",
 	"argocdAgentCa", "argocdAgentCert", "argocdAgentKey", "argocdAgentJwtKey",
+	"authentikSecretKey", "authentikPostgresPassword", "keycloakAdminPassword", "keycloakPostgresPassword",
+	"oauth2ProxyClientId", "oauth2ProxyClientSecret", "oauth2ProxyCookieSecret",
 }
 
 allowed_keys := {
 	"clusterName", "provider", "kubernetesVersion", "apiServerHost", "apiServerPort",
 	"domain", "region", "vpcId", "lbIpPool", "coreOnly", "disable", "enable", "defaultStorageClass", "secretRefs",
-	"pullThroughCacheIp", "argocdAgent",
+	"pullThroughCacheIp", "argocdAgent", "authentik", "keycloak", "oauth2Proxy",
 }
 
 types := {
@@ -22,6 +24,7 @@ types := {
 	"region": "string", "vpcId": "string", "lbIpPool": "array", "coreOnly": "boolean",
 	"disable": "array", "enable": "array", "defaultStorageClass": "string", "secretRefs": "object",
 	"pullThroughCacheIp": "string", "argocdAgent": "object",
+	"authentik": "object", "keycloak": "object", "oauth2Proxy": "object",
 }
 
 disabled := {d | some d in object.get(input, "disable", [])}
@@ -52,6 +55,14 @@ required contains k if {
 }
 
 required contains "argocdAgent" if "argocd-agent" in enabled_opt_ins
+
+# Each identity add-on's settings key, keyed by catalog name.
+identity := {"authentik": "authentik", "keycloak": "keycloak", "oauth2-proxy": "oauth2Proxy"}
+
+required contains k if {
+	some name, k in identity
+	name in enabled_opt_ins
+}
 
 required contains "region" if input.provider == "eks"
 
@@ -91,6 +102,18 @@ required_refs contains k if {
 }
 
 required_refs contains "argocdAgentJwtKey" if "argocd-agent-principal" in enabled_opt_ins
+
+identity_refs := {
+	"authentik": {"authentikSecretKey", "authentikPostgresPassword"},
+	"keycloak": {"keycloakAdminPassword", "keycloakPostgresPassword"},
+	"oauth2-proxy": {"oauth2ProxyClientId", "oauth2ProxyClientSecret", "oauth2ProxyCookieSecret"},
+}
+
+required_refs contains k if {
+	some name, refs in identity_refs
+	name in enabled_opt_ins
+	some k in refs
+}
 
 required_refs contains "githubToken" if {
 	has_domain
@@ -179,3 +202,27 @@ valid_agent(a) if {
 	is_string(a.principalAddress)
 	is_number(a.principalPort)
 }
+
+deny contains sprintf("%s is only allowed when %s is enabled", [k, name]) if {
+	some name, k in identity
+	k in object.keys(input)
+	not name in enabled_opt_ins
+}
+
+deny contains sprintf("%s needs postgresHost (string) and optionally postgresPort (number)", [k]) if {
+	some k in {"authentik", "keycloak"}
+	k in enabled_opt_ins
+	not valid_postgres(object.get(input, k, {}))
+}
+
+valid_postgres(p) if {
+	is_string(p.postgresHost)
+	is_number(object.get(p, "postgresPort", 5432))
+}
+
+deny contains "oauth2Proxy needs issuerUrl (string)" if {
+	"oauth2-proxy" in enabled_opt_ins
+	not valid_proxy(object.get(input, "oauth2Proxy", {}))
+}
+
+valid_proxy(p) if is_string(p.issuerUrl)

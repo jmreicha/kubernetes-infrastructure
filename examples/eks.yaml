@@ -1,4 +1,4 @@
-# EKS, full stack with a domain; Falco on; hub for the Argo CD agent.
+# EKS, full stack with a domain; Falco, Authentik, oauth2-proxy; Argo CD agent hub.
 # Copy to clusters/<name>.yaml and set clusterName to <name> (see README).
 
 # Must match the file name, without .yaml.
@@ -29,10 +29,12 @@ domain: eks.example.com
 # coreOnly: true
 
 # Opt-in components to add: zot and rook (baremetal), falco, tetragon,
-# argocd-agent, argocd-agent-principal.
+# argocd-agent, argocd-agent-principal, authentik, keycloak, oauth2-proxy.
 enable:
   - argocd-agent-principal # accept argocd-agent spokes from other clusters
   - falco # runtime inspection
+  - authentik # identity provider; needs authentik
+  - oauth2-proxy # OIDC auth proxy; needs oauth2Proxy
 
 # Optional components to remove: any platform component, longhorn, local-path-provisioner.
 # disable: [kargo]
@@ -48,6 +50,20 @@ enable:
 # argocdAgent:
 #   principalAddress: agent.hub.example.com
 #   principalPort: 443
+
+# External Postgres for Authentik (with authentik); database and user are both authentik.
+# postgresPort defaults to 5432.
+authentik:
+  postgresHost: authentik.cluster-abc.us-west-2.rds.amazonaws.com
+
+# External Postgres for Keycloak (with keycloak); database and user are both keycloak.
+# postgresPort defaults to 5432.
+# keycloak:
+#   postgresHost: postgres.example.com
+
+# OIDC issuer oauth2-proxy signs users in with (with oauth2-proxy).
+oauth2Proxy:
+  issuerUrl: https://auth.eks.example.com/application/o/oauth2-proxy/
 
 # 1Password references read by bootstrap with `op read`; never secret values.
 secretRefs:
@@ -75,3 +91,16 @@ secretRefs:
 
   # JWT signing key (with argocd-agent-principal).
   argocdAgentJwtKey: op://infra/argocd-agent-principal/jwt-key
+
+  # Authentik secret key and Postgres password (with authentik).
+  authentikSecretKey: op://infra/eks-authentik/secret-key
+  authentikPostgresPassword: op://infra/eks-authentik/db-password
+
+  # Keycloak admin and Postgres passwords (with keycloak).
+  # keycloakAdminPassword: op://infra/eks/keycloakAdminPassword
+  # keycloakPostgresPassword: op://infra/eks/keycloakPostgresPassword
+
+  # oauth2-proxy OIDC client and cookie secret (with oauth2-proxy).
+  oauth2ProxyClientId: op://infra/eks-oauth2-proxy/client-id
+  oauth2ProxyClientSecret: op://infra/eks-oauth2-proxy/client-secret
+  oauth2ProxyCookieSecret: op://infra/eks-oauth2-proxy/cookie-secret

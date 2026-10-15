@@ -33,6 +33,13 @@ SIDE-EFFECT:
   - MUST: read the Kargo admin password hash and token signing key from the Secret seeded by SecretSeed
     SEE: ./bootstrap@SecretSeed
   - MUST-NOT: configure Kargo to reach any other cluster or any Kargo control plane
+  - WHEN: authentik is enabled
+    MUST: "install Authentik against the external Postgres at `authentik.postgresHost` (port `authentik.postgresPort`, default 5432, database and user `authentik`), reading its secret key and database password from the Secret seeded by SecretSeed"
+  - WHEN: keycloak is enabled
+    MUST: "install Keycloak against the external Postgres at `keycloak.postgresHost` (port `keycloak.postgresPort`, default 5432, database and user `keycloak`), reading its bootstrap admin password and database password from the Secret seeded by SecretSeed"
+  - WHEN: oauth2-proxy is enabled
+    MUST: "install oauth2-proxy with the OIDC provider at `oauth2Proxy.issuerUrl`, reading its client id, client secret, and cookie secret from the Secret seeded by SecretSeed"
+  - MUST-NOT: expose Authentik, Keycloak, or oauth2-proxy through a route, or create any realm, application, or OIDC client in them
 ERROR:
   - WHEN: any platform-layer Application is not Synced and Healthy 30 minutes after the platform root Application is applied
     MUST: fail, naming every Application that is Degraded, OutOfSync, Missing, or Progressing

@@ -38,6 +38,12 @@ INPUT:
   - MAY: "carry `enable`, a list of catalog entries marked `optIn`, which are installed only when listed here"
   - WHEN: zot is enabled
     MUST: "carry `pullThroughCacheIp`, an address in `lbIpPool` that the zot LoadBalancer Service takes and nodes use as their registry mirror"
+  - WHEN: authentik is enabled
+    MUST: "carry `authentik.postgresHost` (string), optionally `authentik.postgresPort` (number, default 5432), and `secretRefs.authentikSecretKey` and `secretRefs.authentikPostgresPassword`, each an op:// reference"
+  - WHEN: keycloak is enabled
+    MUST: "carry `keycloak.postgresHost` (string), optionally `keycloak.postgresPort` (number, default 5432), and `secretRefs.keycloakAdminPassword` and `secretRefs.keycloakPostgresPassword`, each an op:// reference"
+  - WHEN: oauth2-proxy is enabled
+    MUST: "carry `oauth2Proxy.issuerUrl`, the OIDC issuer URL, and `secretRefs.oauth2ProxyClientId`, `secretRefs.oauth2ProxyClientSecret`, and `secretRefs.oauth2ProxyCookieSecret`, each an op:// reference"
   - WHEN: provider is baremetal, both longhorn and local-path-provisioner are disabled, and rook is not enabled
     MUST: "carry `defaultStorageClass`, the name of a StorageClass provided outside this project"
   - WHEN: "`disable` or `enable` names an entry that the catalog does not offer for this provider"
@@ -59,6 +65,8 @@ ERROR:
     MUST: be rejected, asking for longhorn to be disabled, because Ceph's StorageClass replaces Longhorn's as the default
   - WHEN: "`defaultStorageClass` is present while longhorn or local-path-provisioner is not disabled, rook is enabled, or provider is not baremetal"
     MUST: be rejected, because the cluster would have two candidate default StorageClasses
+  - WHEN: "`authentik`, `keycloak`, or `oauth2Proxy` is present while that component is not enabled"
+    MUST: be rejected
   - WHEN: clusterName does not match the file name without .yaml
     MUST: be rejected, naming both values
   - MUST: be rejected, naming the offending key, for any key not listed in this spec
