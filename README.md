@@ -91,7 +91,8 @@ Remove the inline manifest afterwards so `talosctl upgrade-k8s` can't roll back 
 - **Turn components on or off** per cluster, the same way in every layer: `disable: [name]`
   removes an optional component, `enable: [name]` adds an opt-in one. On bare metal,
   `disable: [longhorn]` switches storage to local-path-provisioner, or add `enable: [rook]`
-  for Rook Ceph. Falco and Tetragon are off unless named in `enable`.
+  for Rook Ceph. `enable: [csi-driver-nfs]` and `[democratic-csi]` add NFS and iSCSI
+  StorageClasses next to the default one. Falco and Tetragon are off unless named in `enable`.
 - **Identity:** `enable: [authentik]`, `[keycloak]`, or `[oauth2-proxy]`, with the settings and
   `secretRefs` shown commented out in every example. Authentik and Keycloak need an external Postgres.
 - **Argo CD agent:** `enable: [argocd-agent]` with `argocdAgent.principalAddress` reports a

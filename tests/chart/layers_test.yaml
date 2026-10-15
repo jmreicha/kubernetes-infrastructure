@@ -192,12 +192,16 @@ tests:
       layer: platform
     asserts:
       - hasDocuments: { count: 0 }
-  - it: baremetal core layer renders exactly 14 Applications
+  - it: baremetal core layer renders exactly 16 Applications
     values: [../../examples/baremetal.yaml]
     set:
       layer: core
     asserts:
-      - hasDocuments: { count: 14 }
+      - hasDocuments: { count: 16 }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: csi-driver-nfs, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: democratic-csi, any: true }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: zot, any: true }
       - containsDocument:

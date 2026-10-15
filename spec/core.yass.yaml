@@ -62,6 +62,10 @@ INPUT:
     MUST: "rely on every node carrying the Talos `iscsi-tools` and `util-linux-tools` system extensions and the Longhorn kubelet extraMounts"
   - WHEN: rook is enabled
     MUST: rely on at least three nodes carrying an unused raw block device, which Ceph claims for its OSDs
+  - WHEN: csi-driver-nfs is enabled
+    MUST: "rely on the NFS export at `nfs.server`:`nfs.share` being reachable and writable from every node"
+  - WHEN: democratic-csi is enabled
+    MUST: "rely on every node carrying the Talos `iscsi-tools` system extension, and on the storage backend named in the seeded driver config being reachable"
   - WHEN: longhorn is disabled, rook is not enabled, and local-path-provisioner is not disabled
     MUST: "rely on every node's Talos machine config making `/var/local-path-provisioner` writable to the provisioner"
   - WHEN: longhorn and local-path-provisioner are both disabled and rook is not enabled
@@ -74,6 +78,10 @@ SIDE-EFFECT:
     MUST: install Longhorn with its StorageClass marked default, and render no local-path-provisioner Application
   - WHEN: rook is enabled
     MUST: "install the Rook operator and a Ceph cluster over every node and unused device, with only the `ceph-block` RBD pool, whose StorageClass is marked default, and no CephFS or object store; render no local-path-provisioner Application"
+  - WHEN: csi-driver-nfs is enabled
+    MUST: "install the NFS CSI driver with a StorageClass `nfs-csi` on `nfs.server`:`nfs.share`, not marked default"
+  - WHEN: democratic-csi is enabled
+    MUST: "install democratic-csi for iSCSI with the driver `democraticCsi.driver`, reading its full driver config from the Secret seeded by SecretSeed, running iscsiadm on the host through nsenter, with a StorageClass `iscsi` not marked default"
   - WHEN: longhorn is disabled, rook is not enabled, and local-path-provisioner is not disabled
     MUST: install local-path-provisioner with its StorageClass marked default
   - WHEN: longhorn and local-path-provisioner are both disabled and rook is not enabled

@@ -21,6 +21,12 @@ pullThroughCacheIp: ""
 argocdAgent:
   principalAddress: ""
   principalPort: 443
+# Extra baremetal CSI drivers (when enabled): NFS export, democratic-csi driver name.
+nfs:
+  server: ""
+  share: ""
+democraticCsi:
+  driver: ""
 # Identity add-ons (when enabled): external Postgres host (port defaults to 5432), OIDC issuer.
 authentik:
   postgresHost: ""
@@ -40,7 +46,16 @@ pullThroughCacheRegistries:
 
 # Namespaces whose workloads need host access (spec/security); all others enforce baseline.
 privilegedNamespaces:
-  [kube-system, falco, longhorn-system, rook-ceph, local-path-storage, kubevirt, cdi]
+  [
+    kube-system,
+    falco,
+    longhorn-system,
+    rook-ceph,
+    democratic-csi,
+    local-path-storage,
+    kubevirt,
+    cdi,
+  ]
 
 # Cluster-scoped kinds the platform AppProject may create.
 platformClusterKinds:
@@ -276,6 +291,72 @@ catalog:
       # Block only; the chart's ceph-block pool is the default StorageClass.
       cephFileSystems: []
       cephObjectStores: []
+
+  # Extra CSI drivers alongside the default storage, each with a non-default StorageClass.
+  - name: csi-driver-nfs
+    chart: csi-driver-nfs
+    repoURL: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
+    version: 4.13.4
+    namespace: kube-system
+    layer: core
+    optIn: true
+    providers: [baremetal]
+    wave: 1
+    values: |
+      storageClass:
+        create: true
+        name: nfs-csi
+        parameters:
+          server: {{ .Values.nfs.server | quote }}
+          share: {{ .Values.nfs.share | quote }}
+        reclaimPolicy: Delete
+        volumeBindingMode: Immediate
+
+  # iSCSI through democratic-csi; the driver config (backend and credentials) is seeded by bootstrap.
+  - name: democratic-csi
+    chart: democratic-csi
+    repoURL: https://democratic-csi.github.io/charts
+    version: 0.15.1
+    namespace: democratic-csi
+    layer: core
+    optIn: true
+    providers: [baremetal]
+    wave: 1
+    values: |
+      csiDriver:
+        name: org.democratic-csi.iscsi
+      driver:
+        existingConfigSecret: democratic-csi-driver-config
+        config:
+          driver: {{ .Values.democraticCsi.driver | quote }}
+      storageClasses:
+        - name: iscsi
+          defaultClass: false
+          reclaimPolicy: Delete
+          volumeBindingMode: Immediate
+          allowVolumeExpansion: true
+          parameters:
+            fsType: ext4
+      # The chart defaults to :latest; pin the image (spec/security).
+      controller:
+        driver:
+          image:
+            # renovate: datasource=docker depName=ghcr.io/democratic-csi/democratic-csi
+            tag: v1.1.0
+      # Talos: iscsiadm runs on the host through nsenter (needs the iscsi-tools extension).
+      node:
+        hostPID: true
+        driver:
+          image:
+            # renovate: datasource=docker depName=ghcr.io/democratic-csi/democratic-csi
+            tag: v1.1.0
+          extraEnv:
+            - name: ISCSIADM_HOST_STRATEGY
+              value: nsenter
+            - name: ISCSIADM_HOST_PATH
+              value: /usr/local/sbin/iscsiadm
+          iscsiDirHostPath: /usr/local/etc/iscsi
+          iscsiDirHostPathType: ""
 
   - name: local-path-provisioner
     path: deploy/chart/local-path-provisioner

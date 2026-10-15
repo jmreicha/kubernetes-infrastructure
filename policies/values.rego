@@ -9,13 +9,13 @@ secret_keys := {
 	"kargoTokenSigningKey", "cloudflareApiToken", "githubToken", "digitaloceanToken",
 	"argocdAgentCa", "argocdAgentCert", "argocdAgentKey", "argocdAgentJwtKey",
 	"authentikSecretKey", "authentikPostgresPassword", "keycloakAdminPassword", "keycloakPostgresPassword",
-	"oauth2ProxyClientId", "oauth2ProxyClientSecret", "oauth2ProxyCookieSecret",
+	"oauth2ProxyClientId", "oauth2ProxyClientSecret", "oauth2ProxyCookieSecret", "democraticCsiConfig",
 }
 
 allowed_keys := {
 	"clusterName", "provider", "kubernetesVersion", "apiServerHost", "apiServerPort",
 	"domain", "region", "vpcId", "lbIpPool", "coreOnly", "disable", "enable", "defaultStorageClass", "secretRefs",
-	"pullThroughCacheIp", "argocdAgent", "authentik", "keycloak", "oauth2Proxy",
+	"pullThroughCacheIp", "argocdAgent", "authentik", "keycloak", "oauth2Proxy", "nfs", "democraticCsi",
 }
 
 types := {
@@ -24,7 +24,7 @@ types := {
 	"region": "string", "vpcId": "string", "lbIpPool": "array", "coreOnly": "boolean",
 	"disable": "array", "enable": "array", "defaultStorageClass": "string", "secretRefs": "object",
 	"pullThroughCacheIp": "string", "argocdAgent": "object",
-	"authentik": "object", "keycloak": "object", "oauth2Proxy": "object",
+	"authentik": "object", "keycloak": "object", "oauth2Proxy": "object", "nfs": "object", "democraticCsi": "object",
 }
 
 disabled := {d | some d in object.get(input, "disable", [])}
@@ -61,6 +61,15 @@ identity := {"authentik": "authentik", "keycloak": "keycloak", "oauth2-proxy": "
 
 required contains k if {
 	some name, k in identity
+	name in enabled_opt_ins
+}
+
+# Each baremetal CSI driver's settings key, keyed by catalog name.
+csi := {"csi-driver-nfs": "nfs", "democratic-csi": "democraticCsi"}
+
+required contains k if {
+	input.provider == "baremetal"
+	some name, k in csi
 	name in enabled_opt_ins
 }
 
@@ -113,6 +122,11 @@ required_refs contains k if {
 	some name, refs in identity_refs
 	name in enabled_opt_ins
 	some k in refs
+}
+
+required_refs contains "democraticCsiConfig" if {
+	input.provider == "baremetal"
+	"democratic-csi" in enabled_opt_ins
 }
 
 required_refs contains "githubToken" if {
@@ -226,3 +240,26 @@ deny contains "oauth2Proxy needs issuerUrl (string)" if {
 }
 
 valid_proxy(p) if is_string(p.issuerUrl)
+
+deny contains sprintf("%s is only allowed when %s is enabled", [k, name]) if {
+	some name, k in csi
+	k in object.keys(input)
+	not name in enabled_opt_ins
+}
+
+deny contains "nfs needs server and share (strings)" if {
+	"nfs" in required
+	not valid_nfs(object.get(input, "nfs", {}))
+}
+
+valid_nfs(n) if {
+	is_string(n.server)
+	is_string(n.share)
+}
+
+deny contains "democraticCsi needs driver (string), such as freenas-api-iscsi" if {
+	"democraticCsi" in required
+	not valid_democratic(object.get(input, "democraticCsi", {}))
+}
+
+valid_democratic(d) if is_string(d.driver)

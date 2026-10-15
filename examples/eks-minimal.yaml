@@ -28,8 +28,8 @@ vpcId: vpc-0123456789abcdef0
 # Stop after the core layer (no platform components).
 # coreOnly: true
 
-# Opt-in components to add: zot and rook (baremetal), falco, tetragon,
-# argocd-agent, argocd-agent-principal, authentik, keycloak, oauth2-proxy.
+# Opt-in components to add: zot, rook, csi-driver-nfs, democratic-csi (baremetal), falco,
+# tetragon, argocd-agent, argocd-agent-principal, authentik, keycloak, oauth2-proxy.
 # enable: [falco]
 
 # Optional components to remove: any platform component, longhorn, local-path-provisioner.
@@ -56,6 +56,16 @@ disable:
 # argocdAgent:
 #   principalAddress: agent.hub.example.com
 #   principalPort: 443
+
+# NFS export for the nfs-csi StorageClass (with csi-driver-nfs).
+# nfs:
+#   server: nas.example.com
+#   share: /export/k8s
+
+# democratic-csi driver for the iscsi StorageClass, such as freenas-api-iscsi or
+# zfs-generic-iscsi (with democratic-csi); the rest of its config is secretRefs.democraticCsiConfig.
+# democraticCsi:
+#   driver: freenas-api-iscsi
 
 # External Postgres for Authentik (with authentik); database and user are both authentik.
 # postgresPort defaults to 5432.
@@ -97,6 +107,9 @@ secretRefs:
 
   # JWT signing key (with argocd-agent-principal).
   # argocdAgentJwtKey: op://infra/eks/argocdAgentJwtKey
+
+  # Whole democratic-csi driver config YAML, backend and credentials (with democratic-csi).
+  # democraticCsiConfig: op://infra/eks/democraticCsiConfig
 
   # Authentik secret key and Postgres password (with authentik).
   # authentikSecretKey: op://infra/eks/authentikSecretKey

@@ -250,3 +250,44 @@ test_identity_settings_shape_checked if {
 	some o in d
 	contains(o, "oauth2Proxy needs")
 }
+
+csi_catalog := array.concat(catalog, [
+	{"name": "csi-driver-nfs", "layer": "core", "optIn": true, "providers": ["baremetal"]},
+	{"name": "democratic-csi", "layer": "core", "optIn": true, "providers": ["baremetal"]},
+])
+
+csi_bm := object.union(base_bm, {
+	"enable": ["csi-driver-nfs", "democratic-csi"],
+	"nfs": {"server": "nas", "share": "/export"}, "democraticCsi": {"driver": "freenas-api-iscsi"},
+	"secretRefs": {"democraticCsiConfig": "op://v/d/config"},
+})
+
+test_csi_drivers_pass if count(values.deny) == 0 with data.catalog as csi_catalog with input as csi_bm
+
+test_csi_drivers_need_settings_and_config if {
+	d := values.deny with data.catalog as csi_catalog with input as object.remove(
+		object.union(csi_bm, {"secretRefs": base_bm.secretRefs}),
+		["nfs", "democraticCsi"],
+	)
+	d["missing required key: nfs"]
+	d["missing required key: democraticCsi"]
+}
+
+test_democratic_csi_needs_config_ref if {
+	values.deny["missing required key: secretRefs.democraticCsiConfig"] with data.catalog as csi_catalog
+		with input as object.union(object.remove(csi_bm, ["secretRefs"]), {"secretRefs": base_bm.secretRefs})
+}
+
+test_csi_settings_without_enable_denied if {
+	some m in values.deny with data.catalog as csi_catalog with input as object.union(csi_bm, {"enable": []})
+	contains(m, "nfs is only allowed")
+}
+
+test_nfs_settings_shape_checked if {
+	some m in values.deny with data.catalog as csi_catalog with input as object.union(object.remove(csi_bm, ["nfs"]), {"nfs": {"server": "nas"}})
+	contains(m, "nfs needs")
+}
+
+test_csi_drivers_on_eks_have_no_effect if {
+	count(values.deny) == 0 with data.catalog as csi_catalog with input as object.union(base_eks, {"enable": ["csi-driver-nfs", "democratic-csi"]})
+}

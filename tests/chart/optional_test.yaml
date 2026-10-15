@@ -131,3 +131,53 @@ tests:
       - equal:
           path: 'spec.source.helm.valuesObject.extraArgs["oidc-issuer-url"]'
           value: https://auth.example.com/application/o/proxy/
+  - it: the nfs and iscsi CSI drivers are off by default
+    values: [../../examples/baremetal-minimal.yaml]
+    set: { layer: core }
+    asserts:
+      - notEqual: { path: metadata.name, value: csi-driver-nfs }
+      - notEqual: { path: metadata.name, value: democratic-csi }
+  - it: csi-driver-nfs renders a non-default StorageClass on the share from cluster values
+    values: [../../examples/baremetal-minimal.yaml]
+    set:
+      layer: core
+      enable: [csi-driver-nfs]
+      nfs: { server: nas.example.com, share: /export/k8s }
+    documentSelector: { path: metadata.name, value: csi-driver-nfs }
+    asserts:
+      - equal: { path: spec.destination.namespace, value: kube-system }
+      - equal: { path: spec.source.helm.valuesObject.storageClass.create, value: true }
+      - equal: { path: spec.source.helm.valuesObject.storageClass.name, value: nfs-csi }
+      - equal:
+          {
+            path: spec.source.helm.valuesObject.storageClass.parameters.server,
+            value: nas.example.com,
+          }
+      - equal:
+          { path: spec.source.helm.valuesObject.storageClass.parameters.share, value: /export/k8s }
+      - notExists: { path: spec.source.helm.valuesObject.storageClass.annotations }
+  - it: democratic-csi reads its driver config from the seeded Secret and runs on Talos
+    values: [../../examples/baremetal-minimal.yaml]
+    set: { layer: core, enable: [democratic-csi], democraticCsi: { driver: freenas-api-iscsi } }
+    documentSelector: { path: metadata.name, value: democratic-csi }
+    asserts:
+      - equal: { path: spec.destination.namespace, value: democratic-csi }
+      - equal:
+          {
+            path: spec.source.helm.valuesObject.driver.existingConfigSecret,
+            value: democratic-csi-driver-config,
+          }
+      - equal:
+          { path: spec.source.helm.valuesObject.driver.config.driver, value: freenas-api-iscsi }
+      - equal: { path: spec.source.helm.valuesObject.node.hostPID, value: true }
+      - equal:
+          {
+            path: spec.source.helm.valuesObject.node.driver.iscsiDirHostPath,
+            value: /usr/local/etc/iscsi,
+          }
+      - equal: { path: "spec.source.helm.valuesObject.storageClasses[0].name", value: iscsi }
+      - equal:
+          { path: "spec.source.helm.valuesObject.storageClasses[0].defaultClass", value: false }
+      - equal:
+          path: 'spec.syncPolicy.managedNamespaceMetadata.labels["pod-security.kubernetes.io/enforce"]'
+          value: privileged

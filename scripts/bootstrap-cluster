@@ -110,6 +110,10 @@ enabled kargo && seed kargo kargo-admin \
 [ -n "$domain" ] && [ "$provider" = doks ] \
   && seed external-dns digitalocean-api-token "token=$(val .secretRefs.digitaloceanToken)"
 
+# democratic-csi's whole driver config (backend and credentials) is one 1Password value.
+[ "$provider" = baremetal ] && opted_in democratic-csi && seed democratic-csi democratic-csi-driver-config \
+  "driver-config-file.yaml=$(val .secretRefs.democraticCsiConfig)"
+
 # Identity add-ons read these Secrets by name (cluster/values.yaml).
 opted_in authentik && seed authentik authentik \
   "AUTHENTIK_SECRET_KEY=$(val .secretRefs.authentikSecretKey)" \

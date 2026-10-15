@@ -70,6 +70,8 @@ RETURN:
     MUST: "yield, in namespace `argocd`, the CA Secret `argocd-agent-ca` and the client certificate Secret `argocd-agent-client-tls`"
   - WHEN: argocd-agent-principal is enabled
     MUST: "yield, in namespace `argocd`, the CA Secret `argocd-agent-ca`, the server certificate Secrets `argocd-agent-principal-tls`, `argocd-agent-resource-proxy-tls`, and `argocd-redis-proxy-tls`, and the JWT key Secret `argocd-agent-jwt`"
+  - WHEN: provider is baremetal and democratic-csi is enabled
+    MUST: "yield, in namespace `democratic-csi`, the Secret `democratic-csi-driver-config` holding the whole driver config file, read as one value"
   - WHEN: authentik is enabled
     MUST: "yield, in namespace `authentik`, the Secret `authentik` holding the Authentik secret key and Postgres password"
   - WHEN: keycloak is enabled
