@@ -46,11 +46,11 @@ How the boundary is enforced:
 
 Optionality works the same way in every layer. Each catalog entry is one of:
 
-| Kind     | Default       | Cluster values               | Entries                                                                                                                                                                                                                                   |
-| -------- | ------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Required | Installed     | Can't be turned off          | Everything not listed below                                                                                                                                                                                                               |
-| Optional | Installed     | `disable: [name]` removes it | Every platform component except the identity add-ons, `longhorn`, `local-path-provisioner`                                                                                                                                                |
-| Opt-in   | Not installed | `enable: [name]` adds it     | `zot` (bare metal pull-through cache), `rook` (bare metal Ceph), `csi-driver-nfs` and `democratic-csi` (bare metal NFS and iSCSI), `falco`, `tetragon`, `argocd-agent`, `argocd-agent-principal`, `authentik`, `keycloak`, `oauth2-proxy` |
+| Kind     | Default       | Cluster values               | Entries                                                                                                                                                                                                                                                                                                                                                  |
+| -------- | ------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Required | Installed     | Can't be turned off          | Everything not listed below                                                                                                                                                                                                                                                                                                                              |
+| Optional | Installed     | `disable: [name]` removes it | Every platform component except the identity add-ons, `longhorn`, `local-path-provisioner`                                                                                                                                                                                                                                                               |
+| Opt-in   | Not installed | `enable: [name]` adds it     | `zot` (bare metal pull-through cache), `rook` (bare metal Ceph), `csi-driver-nfs` and `democratic-csi` (bare metal NFS and iSCSI), `falco`, `tetragon`, `argocd-agent`, `argocd-agent-principal`, `authentik`, `keycloak`, `oauth2-proxy`, `kube-prometheus-stack` or `victoria-metrics-k8s-stack`, `grafana`, `arc` (GitHub Actions runners), `openbao` |
 
 Naming anything else in either list is rejected. A name the provider doesn't offer, such as
 `kubevirt` on EKS, is accepted and does nothing.
@@ -70,6 +70,21 @@ Naming anything else in either list is rejected. A name the provider doesn't off
   Authentik and Keycloak use an external Postgres (`<name>.postgresHost`); oauth2-proxy signs
   in through `oauth2Proxy.issuerUrl`. Secrets come from 1Password. None is exposed or configured
   beyond install; add routes, realms, and clients per cluster.
+- **Metrics.** `enable: [kube-prometheus-stack]` or `enable: [victoria-metrics-k8s-stack]`
+  (never both) installs a full metrics stack in `monitoring`, with the prometheus-operator CRDs
+  and a ServiceMonitor for core's kube-state-metrics. `enable: [grafana]` adds Grafana with a
+  datasource for whichever stack is on; its admin password comes from 1Password. See ADRs 65-66.
+  With a stack on, core infrastructure (Cilium, Argo CD, cert-manager, external-secrets, storage,
+  DNS, Karpenter, runtime inspection, kube-state-metrics) gets ServiceMonitors by default;
+  `monitor.add` and `monitor.remove` adjust that per cluster. See ADR 68.
+- **CI runners.** `enable: [arc]` with `arc.githubConfigUrl` installs Actions Runner Controller
+  and one runner scale set named after the cluster (`runs-on: <clusterName>`), registered with a
+  GitHub App from 1Password, in Kubernetes container mode, up to `arc.maxRunners` (default 5).
+  Workflows that need a Docker daemon don't work there. See ADR 67.
+- **Secrets manager.** `enable: [openbao]` with `secretRefs.openbaoSealKey` runs OpenBao as a
+  three-replica Raft cluster that unseals itself with a static key from 1Password and
+  self-initializes with only Kubernetes auth: get in with a token for the `openbao-admin`
+  ServiceAccount and role `admin`. Apps read it through external-secrets. See ADR 69.
 - **Runtime inspection.** Falco and Tetragon are opt-in on every provider; neither is
   installed unless named in `enable`.
 - **Pull-through cache.** `enable: [zot]` with `pullThroughCacheIp` (an address in

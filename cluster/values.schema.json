@@ -53,13 +53,16 @@
         "optIn": { "type": "boolean" },
         "when": { "type": "string" },
         "values": { "type": "string" },
+        "monitor": { "type": "string" },
+        "monitorByDefault": { "type": "boolean" },
         "ignoreDifferences": { "type": "array", "items": { "type": "object" } }
       },
       "oneOf": [
         { "required": ["chart"], "not": { "required": ["path"] } },
         { "required": ["path"], "not": { "required": ["chart"] } }
       ],
-      "not": { "required": ["optional", "optIn"] }
+      "not": { "required": ["optional", "optIn"] },
+      "dependencies": { "monitorByDefault": ["monitor"] }
     }
   }
 }

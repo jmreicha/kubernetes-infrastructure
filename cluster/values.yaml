@@ -34,6 +34,16 @@ keycloak:
   postgresHost: ""
 oauth2Proxy:
   issuerUrl: ""
+# Monitors beyond the catalog defaults, or none at all (ADR 68); only while a metrics stack is on.
+monitor:
+  add: []
+  remove: []
+# Set by scripts/bootstrap-cluster and scripts/talos-cilium-patch: no ServiceMonitor CRD exists yet.
+skipMonitors: false
+# GitHub Actions runners (when arc is enabled): where they register, and the scale-out cap.
+arc:
+  githubConfigUrl: ""
+  maxRunners: 5
 
 # Upstream registries the pull-through cache (zot) mirrors, by host.
 pullThroughCacheRegistries:
@@ -55,6 +65,7 @@ privilegedNamespaces:
     local-path-storage,
     kubevirt,
     cdi,
+    monitoring,
   ]
 
 # Cluster-scoped kinds the platform AppProject may create.
@@ -84,6 +95,19 @@ catalog:
     providers: [eks, baremetal]
     wave: 0
     category: networking
+    monitor: |
+      prometheus:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+          # The CRDs come from the bootstrap layer; Helm can't always see them at render time.
+          trustCRDsExist: true
+      operator:
+        prometheus:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+    monitorByDefault: true
     values: |
       kubeProxyReplacement: true
       encryption:
@@ -136,6 +160,28 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 0
     category: system
+    monitor: |
+      controller:
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+      server:
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+      repoServer:
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+      applicationSet:
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+    monitorByDefault: true
     values: |
       configs:
         cm:
@@ -167,6 +213,12 @@ catalog:
     providers: [eks]
     wave: 1
     category: storage
+    monitor: |
+      controller:
+        enableMetrics: true
+        serviceMonitor:
+          forceEnable: true
+    monitorByDefault: true
     values: |
       storageClasses:
         - name: gp3
@@ -187,6 +239,11 @@ catalog:
     providers: [baremetal]
     wave: 1
     category: storage
+    monitor: |
+      metrics:
+        serviceMonitor:
+          enabled: true
+    monitorByDefault: true
     values: |
       persistence:
         defaultClass: true
@@ -214,6 +271,12 @@ catalog:
     providers: [baremetal]
     wave: 2
     category: storage
+    monitor: |
+      # The operator creates the Ceph ServiceMonitors at runtime; the chart adds the alert rules.
+      monitoring:
+        enabled: true
+        createPrometheusRules: true
+    monitorByDefault: true
     when: '{{ has "rook" .Values.enable }}'
     values: |
       # Block only; the chart's ceph-block pool is the default StorageClass.
@@ -316,6 +379,10 @@ catalog:
     providers: [eks]
     wave: 1
     category: compute
+    monitor: |
+      serviceMonitor:
+        enabled: true
+    monitorByDefault: true
     values: |
       settings:
         clusterName: {{ .Values.clusterName }}
@@ -330,6 +397,11 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 1
     category: security
+    monitor: |
+      prometheus:
+        servicemonitor:
+          enabled: true
+    monitorByDefault: true
     values: |
       crds:
         enabled: true
@@ -374,6 +446,10 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 1
     category: security
+    monitor: |
+      serviceMonitor:
+        enabled: true
+    monitorByDefault: true
 
   - name: onepassword-connect
     chart: connect
@@ -384,6 +460,11 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 1
     category: security
+    monitor: |
+      connect:
+        api:
+          serviceMonitor:
+            enabled: true
     values: |
       connect:
         credentialsName: op-credentials
@@ -404,6 +485,12 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 2
     category: security
+    monitor: |
+      metrics:
+        enabled: true
+      serviceMonitor:
+        create: true
+    monitorByDefault: true
     values: |
       driver:
         kind: modern_ebpf
@@ -418,6 +505,16 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 2
     category: security
+    monitor: |
+      tetragon:
+        prometheus:
+          serviceMonitor:
+            enabled: true
+      tetragonOperator:
+        prometheus:
+          serviceMonitor:
+            enabled: true
+    monitorByDefault: true
 
   # -- networking --
   - name: envoy-gateway
@@ -439,6 +536,10 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 2
     category: networking
+    monitor: |
+      serviceMonitor:
+        enabled: true
+    monitorByDefault: true
     when: '{{ ne .Values.domain "" }}'
     values: |
       domainFilters: [{{ .Values.domain }}]
@@ -476,6 +577,10 @@ catalog:
     providers: [eks]
     wave: 2
     category: networking
+    monitor: |
+      serviceMonitor:
+        enabled: true
+    monitorByDefault: true
     values: |
       clusterName: {{ .Values.clusterName }}
       enableCertManager: true
@@ -492,6 +597,11 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 2
     category: observability
+    monitor: |
+      metrics:
+        enabled: true
+      serviceMonitor:
+        enabled: true
     values: |
       {{- if eq .Values.provider "baremetal" }}
       # Talos kubelets serve self-signed certs by default.
@@ -507,6 +617,123 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 2
     category: observability
+    monitor: |
+      prometheus:
+        monitor:
+          enabled: true
+    monitorByDefault: true
+
+  # Metrics stacks (ADR 65) and Grafana (ADR 66); node-exporter makes monitoring privileged.
+  - name: prometheus-operator-crds
+    chart: prometheus-operator-crds
+    repoURL: https://prometheus-community.github.io/helm-charts
+    version: 32.0.2
+    namespace: monitoring
+    layer: bootstrap
+    providers: [eks, baremetal, doks]
+    wave: 0
+    category: observability
+    when: '{{ ne (include "apps.metricsStack" .) "" }}'
+
+  - name: kube-prometheus-stack
+    chart: kube-prometheus-stack
+    repoURL: https://prometheus-community.github.io/helm-charts
+    version: 92.17.0
+    namespace: monitoring
+    layer: core
+    optIn: true
+    providers: [eks, baremetal, doks]
+    wave: 2
+    category: observability
+    values: |
+      crds:
+        enabled: false
+      grafana:
+        enabled: false
+        # Dashboards still ship as ConfigMaps for the grafana entry's sidecar.
+        forceDeployDashboards: true
+      kubeStateMetrics:
+        enabled: false
+      # Managed control planes don't expose these, and Cilium replaces kube-proxy.
+      kubeEtcd: { enabled: false }
+      kubeControllerManager: { enabled: false }
+      kubeScheduler: { enabled: false }
+      kubeProxy: { enabled: false }
+      prometheusOperator:
+        admissionWebhooks:
+          certManager:
+            enabled: true
+      prometheus:
+        prometheusSpec:
+          # Select every monitor and rule in the cluster, not only this release's.
+          serviceMonitorSelectorNilUsesHelmValues: false
+          podMonitorSelectorNilUsesHelmValues: false
+          probeSelectorNilUsesHelmValues: false
+          ruleSelectorNilUsesHelmValues: false
+          scrapeConfigSelectorNilUsesHelmValues: false
+
+  - name: victoria-metrics-k8s-stack
+    chart: victoria-metrics-k8s-stack
+    repoURL: https://victoriametrics.github.io/helm-charts
+    version: 0.97.1
+    namespace: monitoring
+    layer: core
+    optIn: true
+    providers: [eks, baremetal, doks]
+    wave: 2
+    category: observability
+    values: |
+      # The chart's scrape selectors need the Argo CD Application name as the release.
+      argocdReleaseOverride: victoria-metrics-k8s-stack
+      grafana:
+        enabled: false
+      kube-state-metrics:
+        enabled: false
+      # Its sync job downloads dashboards at runtime; keep the render declarative.
+      defaultDashboards:
+        enabled: false
+      kubeEtcd: { enabled: false }
+      kubeControllerManager: { enabled: false }
+      kubeScheduler: { enabled: false }
+      kubeProxy: { enabled: false }
+      victoria-metrics-operator:
+        admissionWebhooks:
+          certManager:
+            enabled: true
+
+  - name: grafana
+    chart: grafana
+    repoURL: https://grafana-community.github.io/helm-charts
+    version: 14.3.0
+    namespace: monitoring
+    layer: core
+    optIn: true
+    providers: [eks, baremetal, doks]
+    wave: 2
+    category: observability
+    monitor: |
+      serviceMonitor:
+        enabled: true
+    values: |
+      # Seeded by bootstrap; the chart would otherwise generate a new password every render.
+      admin:
+        existingSecret: grafana
+        userKey: admin-user
+        passwordKey: admin-password
+      sidecar:
+        dashboards:
+          enabled: true
+          searchNamespace: ALL
+      {{- with include "apps.metricsStack" . }}
+      datasources:
+        datasources.yaml:
+          apiVersion: 1
+          datasources:
+            - name: {{ ternary "Prometheus" "VictoriaMetrics" (eq . "kube-prometheus-stack") }}
+              type: prometheus
+              isDefault: true
+              url: {{ ternary "http://kube-prometheus-stack-prometheus.monitoring:9090" "http://vmsingle-victoria-metrics-k8s-stack.monitoring:8428" (eq . "kube-prometheus-stack") }}
+      {{- end }}
 
   - name: opentelemetry-operator
     chart: opentelemetry-operator
@@ -517,6 +744,10 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 2
     category: observability
+    monitor: |
+      manager:
+        serviceMonitor:
+          enabled: true
 
   # -- system --
   # Argo CD agent (argoproj-labs/argocd-agent): opt-in hub-and-spoke visibility over each
@@ -531,6 +762,9 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 2
     category: system
+    monitor: |
+      serviceMonitor:
+        enabled: true
     values: |
       agentMode: autonomous
       server: {{ .Values.argocdAgent.principalAddress | quote }}
@@ -549,6 +783,9 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 2
     category: system
+    monitor: |
+      serviceMonitor:
+        enabled: true
     values: |
       service:
         type: LoadBalancer
@@ -573,6 +810,11 @@ catalog:
     providers: [baremetal]
     wave: 2
     category: system
+    monitor: |
+      metrics:
+        enabled: true
+        serviceMonitor:
+          enabled: true
     values: |
       service:
         type: LoadBalancer
@@ -610,6 +852,10 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 2
     category: system
+    monitor: |
+      prometheusExporter:
+        serviceMonitor:
+          enabled: true
     # The chart defaults to :latest; pin the image (docs/spec/security).
     values: |
       prometheusExporter:
@@ -617,6 +863,9 @@ catalog:
           image:
             # renovate: datasource=docker depName=yonahdissen/kor
             tag: v0.6.9
+        # On only when monitored (ADR 68); the chart enables it whenever the CRDs exist.
+        serviceMonitor:
+          enabled: false
       cronJob:
         image:
           # renovate: datasource=docker depName=yonahdissen/kor
@@ -662,6 +911,32 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 4
     category: compute
+    monitor: |
+      prometheus:
+        operator:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+        metricServer:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+
+  # -- observability --
+  - name: k6-operator
+    chart: k6-operator
+    repoURL: https://grafana.github.io/helm-charts
+    version: 4.6.0
+    namespace: k6-operator-system
+    layer: platform
+    optional: true
+    providers: [eks, baremetal, doks]
+    wave: 4
+    category: observability
+    monitor: |
+      metrics:
+        serviceMonitor:
+          enabled: true
 
   # -- data --
   - name: strimzi
@@ -749,6 +1024,10 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 4
     category: system
+    monitor: |
+      reloader:
+        serviceMonitor:
+          enabled: true
 
   - name: argocd-image-updater
     chart: argocd-image-updater
@@ -760,17 +1039,11 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 4
     category: system
-
-  - name: k6-operator
-    chart: k6-operator
-    repoURL: https://grafana.github.io/helm-charts
-    version: 4.6.0
-    namespace: k6-operator-system
-    layer: platform
-    optional: true
-    providers: [eks, baremetal, doks]
-    wave: 4
-    category: system
+    monitor: |
+      metrics:
+        enabled: true
+        serviceMonitor:
+          enabled: true
 
   - name: kargo
     chart: kargo
@@ -782,6 +1055,17 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 4
     category: system
+    monitor: |
+      controller:
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+      managementController:
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
     values: |
       api:
         secret:
@@ -815,6 +1099,149 @@ catalog:
           - secretRef:
               name: kubechecks-tokens
 
+  # GitHub Actions runners (ADR 67): the controller, then one scale set named after the cluster.
+  - name: arc
+    chart: gha-runner-scale-set-controller
+    repoURL: oci://ghcr.io/actions/actions-runner-controller-charts
+    version: 0.15.1
+    namespace: arc-systems
+    layer: platform
+    optIn: true
+    providers: [eks, baremetal, doks]
+    wave: 3
+    category: system
+
+  - name: arc-runners
+    chart: gha-runner-scale-set
+    repoURL: oci://ghcr.io/actions/actions-runner-controller-charts
+    version: 0.15.1
+    namespace: arc-runners
+    layer: platform
+    providers: [eks, baremetal, doks]
+    wave: 4
+    category: system
+    when: '{{ has "arc" .Values.enable }}'
+    values: |
+      githubConfigUrl: {{ .Values.arc.githubConfigUrl | quote }}
+      # Seeded by bootstrap with the GitHub App id, installation id, and private key.
+      githubConfigSecret: arc-github-app
+      runnerScaleSetName: {{ .Values.clusterName }}
+      maxRunners: {{ .Values.arc.maxRunners }}
+      # Helm lookup can't find the controller under Argo CD; tracks the arc release name.
+      controllerServiceAccount:
+        namespace: arc-systems
+        name: arc-gha-rs-controller
+      containerMode:
+        type: kubernetes
+        kubernetesModeWorkVolumeClaim:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 1Gi
+      template:
+        spec:
+          containers:
+            - name: runner
+              # renovate: datasource=docker depName=ghcr.io/actions/actions-runner
+              image: ghcr.io/actions/actions-runner:2.338.2
+              command: [/home/runner/run.sh]
+              env:
+                # Jobs without `container:` run in the runner pod instead of failing.
+                - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+                  value: "false"
+
+  # OpenBao (ADR 69): auto-unsealed from the seeded key, self-initialized; apps read it via external-secrets.
+  - name: openbao
+    chart: openbao
+    repoURL: https://openbao.github.io/openbao-helm
+    version: 0.30.6
+    namespace: openbao
+    layer: platform
+    optIn: true
+    providers: [eks, baremetal, doks]
+    wave: 3
+    category: security
+    values: |
+      injector:
+        enabled: false
+      server:
+        ha:
+          enabled: true
+          replicas: 3
+          raft:
+            enabled: true
+            setNodeId: true
+            config: |
+              ui = true
+              listener "tcp" {
+                tls_disable = 1
+                address = "[::]:8200"
+                cluster_address = "[::]:8201"
+              }
+              storage "raft" {
+                path = "/openbao/data"
+                retry_join {
+                  leader_api_addr = "http://openbao-0.openbao-internal:8200"
+                }
+                retry_join {
+                  leader_api_addr = "http://openbao-1.openbao-internal:8200"
+                }
+                retry_join {
+                  leader_api_addr = "http://openbao-2.openbao-internal:8200"
+                }
+              }
+              service_registration "kubernetes" {}
+              # Key seeded by bootstrap from 1Password; the default chart config can't unseal itself.
+              seal "static" {
+                current_key_id = "1"
+                current_key = "env://BAO_SEAL_KEY"
+              }
+              # The only config OpenBao gets: a way in, since self-init revokes its root token.
+              initialize "kubernetes-auth" {
+                request "enable" {
+                  operation = "update"
+                  path = "sys/auth/kubernetes"
+                  data = { type = "kubernetes" }
+                }
+                request "config" {
+                  operation = "update"
+                  path = "auth/kubernetes/config"
+                  data = { kubernetes_host = "https://kubernetes.default.svc" }
+                }
+              }
+              initialize "admin" {
+                request "policy" {
+                  operation = "update"
+                  path = "sys/policies/acl/admin"
+                  data = {
+                    policy = <<EOP
+              path "*" {
+                capabilities = ["create", "read", "update", "patch", "delete", "list", "sudo"]
+              }
+              EOP
+                  }
+                }
+                request "role" {
+                  operation = "update"
+                  path = "auth/kubernetes/role/admin"
+                  data = {
+                    bound_service_account_names = ["openbao-admin"]
+                    bound_service_account_namespaces = ["openbao"]
+                    token_policies = ["admin"]
+                  }
+                }
+              }
+        extraSecretEnvironmentVars:
+          - envName: BAO_SEAL_KEY
+            secretName: openbao-seal
+            secretKey: key
+      extraObjects:
+        - apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: openbao-admin
+            namespace: openbao
+
   # --- identity add-ons (opt-in); secrets are seeded by bootstrap ---
   - name: authentik
     chart: authentik
@@ -826,6 +1253,12 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 4
     category: security
+    monitor: |
+      server:
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
     values: |
       authentik:
         existingSecret:
@@ -851,6 +1284,9 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 4
     category: security
+    monitor: |
+      serviceMonitor:
+        enabled: true
     values: |
       # No route yet, so no fixed hostname (docs/spec/platform).
       command: [/opt/keycloak/bin/kc.sh, start, --http-port=8080, --hostname-strict=false]
@@ -884,6 +1320,10 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 4
     category: security
+    monitor: |
+      metrics:
+        serviceMonitor:
+          enabled: true
     values: |
       config:
         existingSecret: oauth2-proxy

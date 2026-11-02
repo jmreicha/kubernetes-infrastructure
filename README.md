@@ -8,11 +8,11 @@ Argo CD. One values file per cluster; everything else is shared and pinned.
 
 A cluster comes up in three layers, each waiting for the one before it to be Synced and Healthy:
 
-| Layer     | What                                                        | Installed by                      |
-| --------- | ----------------------------------------------------------- | --------------------------------- |
-| bootstrap | Cilium (CNI) and Argo CD                                    | `scripts/bootstrap-cluster`, once |
-| core      | What every cluster needs: DNS, certs, storage, policy, etc. | Argo CD, AppProject `core`        |
-| platform  | What applications use: Kafka, databases, VMs, Kargo, etc.   | Argo CD, AppProject `platform`    |
+| Layer     | What                                                                | Installed by                      |
+| --------- | ------------------------------------------------------------------- | --------------------------------- |
+| bootstrap | Cilium (CNI), Argo CD, and the Prometheus CRDs with a metrics stack | `scripts/bootstrap-cluster`, once |
+| core      | What every cluster needs: DNS, certs, storage, policy, etc.         | Argo CD, AppProject `core`        |
+| platform  | What applications use: Kafka, databases, VMs, Kargo, etc.           | Argo CD, AppProject `platform`    |
 
 - **`cluster/`** is a Helm chart. `cluster/values.yaml` is the catalog: every project with its chart,
   pinned version, namespace, layer, providers, and sync wave. The chart turns the catalog plus a

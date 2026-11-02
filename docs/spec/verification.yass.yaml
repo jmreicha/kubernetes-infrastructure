@@ -36,6 +36,8 @@ INPUT:
   - MUST: "render the app-of-apps chart with `helm template` for each fixture and each layer"
   - MUST: "render each resulting Application's chart with `helm template --skip-tests` at its pinned version and with the values that Application passes, because Argo CD never runs Helm tests"
   - MUST: render each chart twice, to find resources whose content differs between renders
+  - WHEN: the fixture enables a metrics stack
+    MUST: "render each chart with the `monitoring.coreos.com/v1` API available, as Argo CD sees it once the prometheus-operator CRDs are installed, and with every entry that has `monitor` values monitored, so each snippet is checked whether or not the fixture monitors it"
   - MUST: "use the same Helm and Kustomize versions that the pinned Argo CD release bundles, because a render that passes only with other versions proves nothing"
 RETURN:
   - MUST: "pass only when kubeconform, in strict mode, accepts every rendered manifest, looking up schemas in this order: schemas generated from the CRDs rendered in this run, the default schema location, then the CustomResourceDefinition/catalog schemas at a pinned tag"
@@ -50,7 +52,7 @@ SIDE-EFFECT:
   - MUST: fail when the Catalog table in root.yass.yaml and the catalog in cluster/values.yaml disagree on any entry's name, namespace, layer, providers, or wave
   - MUST: validate the generated Talos patches with talosctl against a freshly generated Talos config
   - MUST: prove its own failure paths end to end, with a deliberately broken catalog and a deliberately risky change
-  - MUST: "provide Rego policies that fail on: a targetRevision that is not an exact version; a missing or out-of-order sync-wave; an Application in the wrong AppProject; an Application missing automated sync, prune, selfHeal, retry, CreateNamespace, or ServerSideApply; a Gateway API CRD rendered by any Application other than envoy-gateway; a missing privileged PSA label on a baremetal namespace that requires one; an IRSA role annotation on eks; a Secret with inline data rendered by the cluster/ chart; a non-hook resource that differs between two renders and is not in its Application's ignoreDifferences; and a cluster-scoped kind rendered by a platform-layer Application that platformClusterKinds does not allow; and an image with no tag or digest, or tagged `latest`"
+  - MUST: "provide Rego policies that fail on: a targetRevision that is not an exact version; a missing or out-of-order sync-wave; an Application in the wrong AppProject; an Application missing automated sync, prune, selfHeal, retry, CreateNamespace, or ServerSideApply; a Gateway API CRD rendered by any Application other than envoy-gateway; a missing privileged PSA label on a baremetal namespace that requires one; an IRSA role annotation on eks; a Secret with inline data rendered by the cluster/ chart; a non-hook resource that differs between two renders and is not in its Application's ignoreDifferences; and a cluster-scoped kind rendered by a platform-layer Application that platformClusterKinds does not allow; and an image with no tag or digest, or tagged `latest`; and a monitored Application whose chart renders no ServiceMonitor, PodMonitor, or PrometheusRule"
 ERROR:
   - WHEN: a chart cannot be fetched at its pinned version
     MUST: fail, naming the chart, repoURL, and version

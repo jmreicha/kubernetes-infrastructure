@@ -25,8 +25,11 @@ export HELM_REPOSITORY_CONFIG="$cache/repositories.yaml" HELM_REPOSITORY_CACHE="
 k8s=$(yq '.kubernetesVersion' "$values")
 mkdir -p "$out/apps" "$out/charts"
 rel=${values#"$root/"}
+# MONITOR_ALL=1 (the render tier): monitor every entry with a snippet, so each one is checked (ADR 68).
+extra=()
+[ "${MONITOR_ALL:-}" = 1 ] && extra=(--set-json "monitor.add=$(yq -o json -I0 '[.catalog[] | select(.monitor) | .name]' "$root/cluster/values.yaml")")
 for layer in cluster core platform; do
-  helm template cluster "$root/cluster" -f "$values" --set layer="$layer" --set clusterValuesFile="$rel" >"$out/apps/$layer.yaml"
+  helm template cluster "$root/cluster" -f "$values" --set layer="$layer" --set clusterValuesFile="$rel" ${extra[@]+"${extra[@]}"} >"$out/apps/$layer.yaml"
 done
 
 # Move a fully fetched temp dir into the cache. rename(2) is atomic and fails if another
@@ -37,9 +40,16 @@ settle() {
   [ -d "$2" ]
 }
 
+# With a metrics stack, Argo CD sees the prometheus-operator API once its CRDs are installed (ADR 68).
+API_VERSIONS=""
+if grep -q 'name: prometheus-operator-crds$' "$out"/apps/*.yaml; then
+  API_VERSIONS="--api-versions monitoring.coreos.com/v1 --api-versions monitoring.coreos.com/v1/ServiceMonitor --api-versions monitoring.coreos.com/v1/PodMonitor"
+fi
+
 # One render per catalog Application, in parallel (roots point back at this repo and are skipped).
 render_app() { # one Application JSON -> charts/<name>.yaml, .unstable.json
-  local app=$1 name ns url ver chart path src dir args pull key
+  local app=$1 name ns url ver chart path src dir args pull key apis
+  read -ra apis <<<"${API_VERSIONS:-}"
   name=$(jq -r .metadata.name <<<"$app")
   ns=$(jq -r .spec.destination.namespace <<<"$app")
   url=$(jq -r .spec.source.repoURL <<<"$app")
@@ -56,7 +66,7 @@ render_app() { # one Application JSON -> charts/<name>.yaml, .unstable.json
         && git -C "$tmp" -c advice.detachedHead=false checkout -q FETCH_HEAD
       settle "$tmp" "$src"
     fi
-    args=(template "$name" "$src/$path" --namespace "$ns" --include-crds --skip-tests --kube-version "$k8s" -f "$out/charts/$name.values.json")
+    args=(template "$name" "$src/$path" --namespace "$ns" --include-crds --skip-tests --kube-version "$k8s" -f "$out/charts/$name.values.json" ${apis[@]+"${apis[@]}"})
     # Argo CD builds a git path with Kustomize when it has no Chart.yaml.
     [ -f "$src/$path/Chart.yaml" ] || args=(kustomize "$src/$path")
   else
@@ -74,7 +84,7 @@ render_app() { # one Application JSON -> charts/<name>.yaml, .unstable.json
       }
       settle "$tmp" "$dir"
     fi
-    args=(template "$name" "$dir/$chart" --namespace "$ns" --include-crds --skip-tests --kube-version "$k8s" -f "$out/charts/$name.values.json")
+    args=(template "$name" "$dir/$chart" --namespace "$ns" --include-crds --skip-tests --kube-version "$k8s" -f "$out/charts/$name.values.json" ${apis[@]+"${apis[@]}"})
   fi
   # Helm 4 prints OCI pull notices on stdout; keep only manifests.
   for n in 1 2; do
@@ -102,7 +112,7 @@ render_app() { # one Application JSON -> charts/<name>.yaml, .unstable.json
 }
 
 export -f render_app settle
-export root out k8s CHART_CACHE="${CHART_CACHE:-$root/.cache/charts}" GIT_CACHE="${GIT_CACHE:-$root/.cache/git}"
+export root out k8s API_VERSIONS CHART_CACHE="${CHART_CACHE:-$root/.cache/charts}" GIT_CACHE="${GIT_CACHE:-$root/.cache/git}"
 jobs=${RENDER_JOBS:-8}
 cat "$out"/apps/*.yaml | yq -N -o json -I0 'select(.kind == "Application" and (.spec.source.repoURL | test("kubernetes-infrastructure") | not))' >"$out/apps.jsonl"
 while read -r app; do

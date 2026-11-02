@@ -16,7 +16,8 @@ export HELM_REPOSITORY_CONFIG="$cache/repositories.yaml" HELM_REPOSITORY_CACHE="
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-app=$(helm template cluster "$root/cluster" -f "$values" --set layer=cluster --set clusterValuesFile=x \
+# skipMonitors: Talos installs Cilium before any ServiceMonitor CRD exists (ADR 68).
+app=$(helm template cluster "$root/cluster" -f "$values" --set layer=cluster --set clusterValuesFile=x --set skipMonitors=true \
   | yq 'select(.kind == "Application" and .metadata.name == "cilium")')
 yq '.spec.source.helm.valuesObject' <<<"$app" >"$tmp/values.yaml"
 helm template cilium "$(yq .spec.source.chart <<<"$app")" --repo "$(yq .spec.source.repoURL <<<"$app")" \

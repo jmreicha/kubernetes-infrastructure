@@ -48,6 +48,13 @@ INPUT:
     MUST: "carry `keycloak.postgresHost` (string), optionally `keycloak.postgresPort` (number, default 5432), and `secretRefs.keycloakAdminPassword` and `secretRefs.keycloakPostgresPassword`, each an op:// reference"
   - WHEN: oauth2-proxy is enabled
     MUST: "carry `oauth2Proxy.issuerUrl`, the OIDC issuer URL, and `secretRefs.oauth2ProxyClientId`, `secretRefs.oauth2ProxyClientSecret`, and `secretRefs.oauth2ProxyCookieSecret`, each an op:// reference"
+  - WHEN: grafana is enabled
+    MUST: "carry `secretRefs.grafanaAdminPassword`, an op:// reference"
+  - MAY: "carry `monitor.add` and `monitor.remove`, lists of catalog entries to monitor beyond the defaults, or not at all; they take effect only while a metrics stack is enabled"
+  - WHEN: openbao is enabled
+    MUST: "carry `secretRefs.openbaoSealKey`, an op:// reference to a 32-byte key in hex (64 characters)"
+  - WHEN: arc is enabled
+    MUST: "carry `arc.githubConfigUrl` (string), the org, repository, or enterprise URL runners register at, optionally `arc.maxRunners` (number, default 5), and `secretRefs.arcGithubAppId`, `secretRefs.arcGithubAppInstallationId`, and `secretRefs.arcGithubAppPrivateKey`, each an op:// reference"
   - WHEN: provider is baremetal, both longhorn and local-path-provisioner are disabled, and rook is not enabled
     MUST: "carry `defaultStorageClass`, the name of a StorageClass provided outside this project"
   - WHEN: "`disable` or `enable` names an entry that the catalog does not offer for this provider"
@@ -67,9 +74,13 @@ ERROR:
     MUST: be rejected, pointing to an ECR pull-through cache configured outside the cluster
   - WHEN: provider is baremetal, rook is enabled, and longhorn is not disabled
     MUST: be rejected, asking for longhorn to be disabled, because Ceph's StorageClass replaces Longhorn's as the default
+  - WHEN: "`monitor.add` or `monitor.remove` names an entry that has no `monitor` values"
+    MUST: be rejected, naming the entry and listing the entries that can be monitored
+  - WHEN: kube-prometheus-stack and victoria-metrics-k8s-stack are both enabled
+    MUST: be rejected, because each is a full metrics stack scraping the same targets
   - WHEN: "`defaultStorageClass` is present while longhorn or local-path-provisioner is not disabled, rook is enabled, or provider is not baremetal"
     MUST: be rejected, because the cluster would have two candidate default StorageClasses
-  - WHEN: "`authentik`, `keycloak`, `oauth2Proxy`, `nfs`, or `democraticCsi` is present while that component is not enabled"
+  - WHEN: "`authentik`, `keycloak`, `oauth2Proxy`, `arc`, `nfs`, or `democraticCsi` is present while that component is not enabled"
     MUST: be rejected
   - WHEN: clusterName does not match the file name without .yaml
     MUST: be rejected, naming both values

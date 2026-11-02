@@ -25,7 +25,7 @@ SIDE-EFFECT:
   - WHEN: provider is doks
     MUST-NOT: modify any object labelled `doks.digitalocean.com/managed=true`
   - WHEN: provider is baremetal
-    MUST: "provide `scripts/talos-cilium-patch`, which renders a Talos machine-config patch that disables the Talos CNI and kube-proxy and installs, as an inline manifest, the catalog's Cilium chart at its pinned version and values"
+    MUST: "provide `scripts/talos-cilium-patch`, which renders a Talos machine-config patch that disables the Talos CNI and kube-proxy and installs, as an inline manifest, the catalog's Cilium chart at its pinned version and values, without its `monitor` values"
   - WHEN: provider is baremetal
     SHOULD: "remove that inline manifest from the machine config once Argo CD has adopted Cilium, because `talosctl upgrade-k8s` re-applies inline manifests and would revert later Cilium upgrades"
   - MUST: "install Cilium with `helm install`, at the catalog version, with kubeProxyReplacement enabled, Hubble enabled, Gateway API support disabled, and k8sServiceHost/k8sServicePort from apiServerHost/apiServerPort"
@@ -35,6 +35,9 @@ SIDE-EFFECT:
     MUST: install Cilium with LB-IPAM enabled over lbIpPool, L2 announcements enabled, and the Talos cgroup and capability settings
   - MUST: "install Argo CD with `helm install` after every node reports Ready, with the Application health customization from GitOpsConventions and a local `kubechecks` account with the apiKey capability and read-only RBAC"
     USES: ../../root@GitOpsConventions
+  - MUST: install Cilium and Argo CD without their `monitor` values, because no ServiceMonitor CRD exists yet; Argo CD applies them when it adopts both releases
+  - WHEN: kube-prometheus-stack or victoria-metrics-k8s-stack is enabled
+    MUST: render the prometheus-operator-crds Application in the bootstrap layer, for Argo CD to install before any monitored Application
   - MUST: seed every Secret before any core Application is applied
     SEE: SecretSeed
   - MUST: apply the AppProjects and the cluster root Application last, rendered from the cluster/ chart with layer=cluster
@@ -78,6 +81,12 @@ RETURN:
     MUST: "yield, in namespace `keycloak`, the Secret `keycloak` holding the Keycloak bootstrap admin password and Postgres password"
   - WHEN: oauth2-proxy is enabled
     MUST: "yield, in namespace `oauth2-proxy`, the Secret `oauth2-proxy` holding the OIDC client id, client secret, and cookie secret"
+  - WHEN: openbao is enabled
+    MUST: "yield, in namespace `openbao`, the Secret `openbao-seal` holding the static seal key as `key`, read without a trailing newline because OpenBao doesn't trim it"
+  - WHEN: arc is enabled
+    MUST: "yield, in namespace `arc-runners`, the Secret `arc-github-app` holding the GitHub App id, installation id, and private key as `github_app_id`, `github_app_installation_id`, and `github_app_private_key`"
+  - WHEN: grafana is enabled
+    MUST: "yield, in namespace `monitoring`, the Secret `grafana` holding the admin user `admin` and the admin password"
   - WHEN: the cluster values carry a domain and kubechecks is not disabled
     MUST: "yield, in namespace `kubechecks`, a Secret holding the GitHub token read with `op read` and an Argo CD API token for a local `kubechecks` account, generated once Argo CD is running"
 SIDE-EFFECT:

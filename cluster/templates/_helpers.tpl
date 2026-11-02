@@ -54,3 +54,21 @@ pod-security.kubernetes.io/enforce: {{ ternary "privileged" "baseline" (has .ns 
 pod-security.kubernetes.io/warn: restricted
 pod-security.kubernetes.io/audit: restricted
 {{- end -}}
+
+{{/* The enabled metrics stack (ADR 65), or empty; policy keeps it to one. */}}
+{{- define "apps.metricsStack" -}}
+{{- $enable := .Values.enable | default list -}}
+{{- range list "kube-prometheus-stack" "victoria-metrics-k8s-stack" }}{{ if has . $enable }}{{ . }}{{ end }}{{ end -}}
+{{- end -}}
+
+{{/* Whether an installed entry renders its monitor (ADR 68): a stack is on, and it is a default or added, and not removed. */}}
+{{- define "apps.monitored" -}}
+{{- $e := .entry -}}{{- $v := .root.Values -}}
+{{- $m := $v.monitor | default dict -}}
+{{- $on := or $e.monitorByDefault (has $e.name ($m.add | default list)) -}}
+{{- if and $e.monitor (not $v.skipMonitors) (include "apps.metricsStack" .root) $on (not (has $e.name ($m.remove | default list))) -}}
+true
+{{- else -}}
+false
+{{- end -}}
+{{- end -}}

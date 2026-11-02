@@ -34,6 +34,7 @@ matches() { # file -> one "depName packageName currentValue" line per match, all
   out=$(matches cluster/values.yaml)
   grep -qx 'yonahdissen/kor yonahdissen/kor v0.6.9 docker' <<<"$out"
   grep -qx 'ghcr.io/zapier/kubechecks ghcr.io/zapier/kubechecks v3.5.0 docker' <<<"$out"
+  grep -qx 'ghcr.io/actions/actions-runner ghcr.io/actions/actions-runner 2.338.2 docker' <<<"$out"
 }
 
 @test "the CRD catalog tag is pinned and matched" {

@@ -181,3 +181,158 @@ tests:
       - equal:
           path: 'spec.syncPolicy.managedNamespaceMetadata.labels["pod-security.kubernetes.io/enforce"]'
           value: privileged
+  - it: metrics stacks, their CRDs, and grafana are off by default
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: core }
+    asserts:
+      - notEqual: { path: metadata.name, value: kube-prometheus-stack }
+      - notEqual: { path: metadata.name, value: victoria-metrics-k8s-stack }
+      - notEqual: { path: metadata.name, value: prometheus-operator-crds }
+      - notEqual: { path: metadata.name, value: grafana }
+  - it: kube-prometheus-stack leaves CRDs, Grafana, and kube-state-metrics to other entries
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: core, enable: [kube-prometheus-stack] }
+    documentSelector: { path: metadata.name, value: kube-prometheus-stack }
+    asserts:
+      - equal: { path: spec.destination.namespace, value: monitoring }
+      - equal: { path: spec.source.helm.valuesObject.crds.enabled, value: false }
+      - equal: { path: spec.source.helm.valuesObject.grafana.enabled, value: false }
+      - equal: { path: spec.source.helm.valuesObject.kubeStateMetrics.enabled, value: false }
+      - equal:
+          {
+            path: spec.source.helm.valuesObject.prometheusOperator.admissionWebhooks.certManager.enabled,
+            value: true,
+          }
+      - equal:
+          {
+            path: spec.source.helm.valuesObject.prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues,
+            value: false,
+          }
+  - it: victoria-metrics-k8s-stack leaves Grafana and kube-state-metrics to other entries
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: core, enable: [victoria-metrics-k8s-stack] }
+    documentSelector: { path: metadata.name, value: victoria-metrics-k8s-stack }
+    asserts:
+      - equal: { path: spec.destination.namespace, value: monitoring }
+      - equal: { path: spec.source.helm.valuesObject.grafana.enabled, value: false }
+      - equal: { path: 'spec.source.helm.valuesObject["kube-state-metrics"].enabled', value: false }
+      - equal:
+          {
+            path: 'spec.source.helm.valuesObject["victoria-metrics-operator"].admissionWebhooks.certManager.enabled',
+            value: true,
+          }
+      - equal: { path: spec.source.helm.valuesObject.defaultDashboards.enabled, value: false }
+  - it: grafana reads the seeded Secret and points at Prometheus
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: core, enable: [kube-prometheus-stack, grafana] }
+    documentSelector: { path: metadata.name, value: grafana }
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.admin.existingSecret, value: grafana }
+      - equal:
+          path: spec.source.helm.valuesObject.datasources["datasources.yaml"].datasources[0].url
+          value: http://kube-prometheus-stack-prometheus.monitoring:9090
+  - it: grafana points at VMSingle with VictoriaMetrics
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: core, enable: [victoria-metrics-k8s-stack, grafana] }
+    documentSelector: { path: metadata.name, value: grafana }
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.datasources["datasources.yaml"].datasources[0].url
+          value: http://vmsingle-victoria-metrics-k8s-stack.monitoring:8428
+  - it: monitoring is a privileged namespace, for node-exporter
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: core, enable: [kube-prometheus-stack] }
+    documentSelector: { path: metadata.name, value: kube-prometheus-stack }
+    asserts:
+      - equal:
+          path: 'spec.syncPolicy.managedNamespaceMetadata.labels["pod-security.kubernetes.io/enforce"]'
+          value: privileged
+  - it: arc and its runners are off by default
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform }
+    asserts:
+      - notEqual: { path: metadata.name, value: arc }
+      - notEqual: { path: metadata.name, value: arc-runners }
+  - it: enabling arc renders the controller before its runners
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform, enable: [arc], arc: { githubConfigUrl: https://github.com/example } }
+    asserts:
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: arc, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: arc-runners, any: true }
+  - it: arc runners register as the cluster with the seeded GitHub App in Kubernetes mode
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform, enable: [arc], arc: { githubConfigUrl: https://github.com/example } }
+    documentSelector: { path: metadata.name, value: arc-runners }
+    asserts:
+      - equal: { path: spec.destination.namespace, value: arc-runners }
+      - equal:
+          { path: spec.source.helm.valuesObject.githubConfigUrl, value: https://github.com/example }
+      - equal: { path: spec.source.helm.valuesObject.githubConfigSecret, value: arc-github-app }
+      - equal: { path: spec.source.helm.valuesObject.runnerScaleSetName, value: eks-minimal }
+      - equal: { path: spec.source.helm.valuesObject.maxRunners, value: 5 }
+      - equal: { path: spec.source.helm.valuesObject.containerMode.type, value: kubernetes }
+      - equal:
+          path: spec.source.helm.valuesObject.controllerServiceAccount
+          value: { namespace: arc-systems, name: arc-gha-rs-controller }
+      - equal:
+          path: 'spec.syncPolicy.managedNamespaceMetadata.labels["pod-security.kubernetes.io/enforce"]'
+          value: baseline
+  - it: arc.maxRunners caps the scale set
+    values: [../../examples/eks-minimal.yaml]
+    set:
+      {
+        layer: platform,
+        enable: [arc],
+        arc: { githubConfigUrl: https://github.com/example, maxRunners: 12 },
+      }
+    documentSelector: { path: metadata.name, value: arc-runners }
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.maxRunners, value: 12 }
+  - it: openbao is off by default
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform }
+    asserts:
+      - notEqual: { path: metadata.name, value: openbao }
+  - it: openbao runs three Raft replicas with no injector, after the default StorageClass exists
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform, enable: [openbao] }
+    documentSelector: { path: metadata.name, value: openbao }
+    asserts:
+      - equal: { path: spec.destination.namespace, value: openbao }
+      - equal: { path: 'metadata.annotations["argocd.argoproj.io/sync-wave"]', value: "3" }
+      - equal: { path: spec.source.helm.valuesObject.injector.enabled, value: false }
+      - equal: { path: spec.source.helm.valuesObject.server.ha.replicas, value: 3 }
+      - equal: { path: spec.source.helm.valuesObject.server.ha.raft.enabled, value: true }
+  - it: openbao auto-unseals from the seeded key and joins and self-initializes
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform, enable: [openbao] }
+    documentSelector: { path: metadata.name, value: openbao }
+    asserts:
+      - contains:
+          path: spec.source.helm.valuesObject.server.extraSecretEnvironmentVars
+          content: { envName: BAO_SEAL_KEY, secretName: openbao-seal, secretKey: key }
+      - matchRegex:
+          {
+            path: spec.source.helm.valuesObject.server.ha.raft.config,
+            pattern: 'seal "static"[^}]*current_key\s*=\s*"env://BAO_SEAL_KEY"',
+          }
+      - matchRegex:
+          {
+            path: spec.source.helm.valuesObject.server.ha.raft.config,
+            pattern: 'leader_api_addr = "http://openbao-2.openbao-internal:8200"',
+          }
+      - matchRegex:
+          {
+            path: spec.source.helm.valuesObject.server.ha.raft.config,
+            pattern: 'initialize "admin"',
+          }
+      - contains:
+          path: spec.source.helm.valuesObject.extraObjects
+          content:
+            {
+              apiVersion: v1,
+              kind: ServiceAccount,
+              metadata: { name: openbao-admin, namespace: openbao },
+            }

@@ -39,6 +39,12 @@ SIDE-EFFECT:
     MUST: "install Keycloak against the external Postgres at `keycloak.postgresHost` (port `keycloak.postgresPort`, default 5432, database and user `keycloak`), reading its bootstrap admin password and database password from the Secret seeded by SecretSeed"
   - WHEN: oauth2-proxy is enabled
     MUST: "install oauth2-proxy with the OIDC provider at `oauth2Proxy.issuerUrl`, reading its client id, client secret, and cookie secret from the Secret seeded by SecretSeed"
+  - WHEN: arc is enabled
+    MUST: "install the Actions Runner Controller in `arc-systems` and one runner scale set in `arc-runners`, named after clusterName and registered at `arc.githubConfigUrl`, authenticating as the GitHub App in the Secret seeded by SecretSeed; in Kubernetes container mode with a 1Gi work volume from the default StorageClass, without requiring jobs to declare a container; scaling from zero to `arc.maxRunners` (default 5) runners on a pinned runner image"
+    SEE: ./bootstrap@SecretSeed
+  - WHEN: openbao is enabled
+    MUST: "install OpenBao in `openbao` as a three-replica HA Raft cluster on the default StorageClass, auto-unsealed by a static seal key read from the Secret seeded by SecretSeed, self-initialized with only the Kubernetes auth method and an `admin` role bound to the `openbao-admin` ServiceAccount, with no agent injector, CSI provider, or route"
+    SEE: ./bootstrap@SecretSeed
   - MUST-NOT: expose Authentik, Keycloak, or oauth2-proxy through a route, or create any realm, application, or OIDC client in them
 ERROR:
   - WHEN: any platform-layer Application is not Synced and Healthy 30 minutes after the platform root Application is applied

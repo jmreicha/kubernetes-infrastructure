@@ -233,3 +233,25 @@ test_init_container_image_checked if {
 	some m in render.deny with input as object.union(image_case("app:1.0"), {"charts": {"x": [d]}})
 	contains(m, "busybox")
 }
+
+monitored(name) := object.union(app(name, "core", "1", "v1.2.3"), {"metadata": {"name": name, "labels": {"layer": "core", "monitored": "true"}, "annotations": {"argocd.argoproj.io/sync-wave": "1"}, "finalizers": ["resources-finalizer.argocd.argoproj.io"]}})
+
+monitor_case(docs) := object.union(good, {"apps": [monitored("cert-manager")], "charts": {"cert-manager": docs}})
+
+test_monitored_app_without_monitor_denied if {
+	some m in render.deny with input as monitor_case([{"kind": "Deployment", "metadata": {"name": "x"}}])
+	contains(m, "monitored but renders no ServiceMonitor, PodMonitor, or PrometheusRule")
+}
+
+test_monitored_app_with_service_monitor_passes if {
+	count(render.deny) == 0 with input as monitor_case([{"kind": "ServiceMonitor", "metadata": {"name": "x"}}])
+}
+
+test_monitored_app_with_pod_monitor_passes if {
+	count(render.deny) == 0 with input as monitor_case([{"kind": "PodMonitor", "metadata": {"name": "x"}}])
+}
+
+# rook-ceph-cluster's operator creates its ServiceMonitors at runtime; the chart renders only rules.
+test_monitored_app_with_prometheus_rule_passes if {
+	count(render.deny) == 0 with input as monitor_case([{"kind": "PrometheusRule", "metadata": {"name": "x"}}])
+}

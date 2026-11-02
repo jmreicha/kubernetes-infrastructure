@@ -157,7 +157,7 @@ tests:
       - equal: { path: spec.ingress, value: [{ fromEntities: [world, cluster] }] }
   - it: argocd's policy comes from the cluster layer and admits kubechecks
     values: [../../examples/eks.yaml]
-    set: { layer: cluster, clusterValuesFile: clusters/eks.yaml }
+    set: { layer: cluster, clusterValuesFile: clusters/eks.yaml, enable: [] }
     template: templates/network-policies.yaml
     documentSelector: { path: metadata.name, value: default-deny-ingress }
     asserts:
@@ -165,6 +165,19 @@ tests:
           path: spec.ingress
           content:
             { fromEndpoints: [{ matchLabels: { k8s:io.kubernetes.pod.namespace: kubechecks } }] }
+  - it: openbao's policy admits external-secrets, which reads secrets from it
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform, enable: [openbao] }
+    template: templates/network-policies.yaml
+    documentSelector: { path: metadata.namespace, value: openbao }
+    asserts:
+      - contains:
+          path: spec.ingress
+          content:
+            {
+              fromEndpoints:
+                [{ matchLabels: { k8s:io.kubernetes.pod.namespace: external-secrets } }],
+            }
   - it: the platform layer does not re-render argocd's policy
     values: [../../examples/eks.yaml]
     set: { layer: platform }

@@ -14,7 +14,7 @@ check() { # values-file -> 0 when every render-tier check passes for that fixtur
   minor=$(yq .kubernetesVersion "$values")
   rm -rf "$dir" && mkdir -p "$dir"
   "$root/scripts/check-values" "$values" || return 1
-  "$root/scripts/render" "$values" "$dir" || return 1
+  MONITOR_ALL=1 "$root/scripts/render" "$values" "$dir" || return 1
   cat "$dir"/charts/*.yaml "$dir"/apps/*.yaml >"$dir/all.yaml"
   "$root/scripts/crd-schemas" "$dir/all.yaml" "$dir/schemas"
   kubeconform -strict -summary -ignore-missing-schemas -cache "$schemas" \

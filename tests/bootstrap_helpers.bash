@@ -12,7 +12,7 @@ setup() {
   yq '.clusterName = "eks"' examples/eks.yaml >"$work/clusters/eks.yaml"
   cp examples/doks.yaml "$work/clusters/doks.yaml"
 }
-teardown() { rm -rf "$CALLS" "$APPLIED" "$work"; }
+teardown() { rm -rf "$CALLS" "$CALLS".*.values "$APPLIED" "$work"; }
 
 calls() { cat "$CALLS"; }
 # In bats a bare `! cmd` only fails the test on its last line; refute works anywhere.

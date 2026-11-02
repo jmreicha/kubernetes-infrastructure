@@ -33,6 +33,9 @@ spec:
     {{- if eq $n "argocd" }}
     - fromEndpoints: [{ matchLabels: { k8s:io.kubernetes.pod.namespace: kubechecks } }]
     {{- end }}
+    {{- if eq $n "openbao" }}
+    - fromEndpoints: [{ matchLabels: { k8s:io.kubernetes.pod.namespace: external-secrets } }]
+    {{- end }}
     {{- end }}
 {{- end }}
 {{- end }}

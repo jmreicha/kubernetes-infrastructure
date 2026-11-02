@@ -226,3 +226,17 @@ deny contains sprintf("%s: %s %s uses unpinned image %s", [a.metadata.name, d.ki
 	some c in containers(pod_spec(d))
 	unpinned(c.image)
 }
+
+# A monitored Application must render its monitor, so a renamed chart value fails CI (ADR 68).
+deny contains sprintf("%s: monitored but renders no ServiceMonitor, PodMonitor, or PrometheusRule", [a.metadata.name]) if {
+	some a in catalog_apps
+	a.metadata.labels.monitored == "true"
+	not has_monitor(a.metadata.name)
+}
+
+has_monitor(name) if {
+	some d in object.get(input.charts, name, [])
+
+	# PrometheusRule: rook-ceph-cluster's operator creates its ServiceMonitors at runtime.
+	d.kind in {"ServiceMonitor", "PodMonitor", "PrometheusRule"}
+}

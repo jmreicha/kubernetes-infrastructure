@@ -27,6 +27,13 @@ SIDE-EFFECT:
   - WHEN: tetragon is enabled
     MUST: install Tetragon in kube-system with its default configuration and no TracingPolicies
   - MUST: install the OpenTelemetry operator with no OpenTelemetryCollector resources
+  - WHEN: kube-prometheus-stack is enabled
+    MUST: "install it in `monitoring` with Prometheus, Alertmanager, node-exporter, its default rules and dashboard ConfigMaps, and its operator webhook certificate from cert-manager; selecting every ServiceMonitor, PodMonitor, Probe, and PrometheusRule in the cluster; without its own CRDs, Grafana, or kube-state-metrics; and without scraping kube-proxy, etcd, the controller manager, or the scheduler"
+  - WHEN: victoria-metrics-k8s-stack is enabled
+    MUST: "install it in `monitoring` with the VictoriaMetrics operator (converting prometheus-operator objects, webhook certificate from cert-manager), VMSingle, VMAgent, VMAlert, Alertmanager, node-exporter, and its default rules; without Grafana, kube-state-metrics, or its dashboard sync job; and without scraping kube-proxy, etcd, the controller manager, or the scheduler"
+  - WHEN: grafana is enabled
+    MUST: "install Grafana in `monitoring` with no route, its admin credentials read from the Secret seeded by SecretSeed, a dashboard sidecar watching every namespace, and a default datasource for whichever metrics stack is enabled"
+    SEE: ./bootstrap@SecretSeed
 ERROR:
   - WHEN: any core Application is not Synced and Healthy 30 minutes after the core root Application is applied
     MUST: fail, naming every Application that is Degraded, OutOfSync, Missing, or Progressing

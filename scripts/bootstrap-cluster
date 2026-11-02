@@ -45,7 +45,8 @@ if [ "$provider" = baremetal ]; then
 fi
 
 # Install a bootstrap Application's chart exactly as Argo CD will later render it.
-render() { helm template cluster "$root/cluster" -f "$values" --set layer="$1" --set clusterValuesFile="$rel"; }
+# skipMonitors: no ServiceMonitor CRD exists yet; Argo CD adds the monitors when it adopts (ADR 68).
+render() { helm template cluster "$root/cluster" -f "$values" --set layer="$1" --set clusterValuesFile="$rel" --set skipMonitors=true; }
 render cluster >"$tmp/cluster.yaml"
 install() {
   local app
@@ -91,7 +92,7 @@ seed() { # namespace secret key=op://ref|- ...   ('-' reads the value from stdin
   local args=() i=0
   for kv in "$@"; do
     local k=${kv%%=*} ref=${kv#*=}
-    if [ "$ref" = - ]; then cat >"$tmp/s$i"; else op read "$ref" >"$tmp/s$i" || die "op read failed for $ref"; fi
+    if [ "$ref" = - ]; then cat >"$tmp/s$i"; else op read ${SEED_NO_NEWLINE:+--no-newline} "$ref" >"$tmp/s$i" || die "op read failed for $ref"; fi
     args+=("--from-file=$k=$tmp/s$i")
     i=$((i + 1))
   done
@@ -120,6 +121,15 @@ opted_in authentik && seed authentik authentik \
   "AUTHENTIK_POSTGRESQL__PASSWORD=$(val .secretRefs.authentikPostgresPassword)"
 opted_in keycloak && seed keycloak keycloak \
   "admin-password=$(val .secretRefs.keycloakAdminPassword)" "db-password=$(val .secretRefs.keycloakPostgresPassword)"
+# OpenBao doesn't trim its static seal key, so it must not end in a newline.
+opted_in openbao && SEED_NO_NEWLINE=1 seed openbao openbao-seal "key=$(val .secretRefs.openbaoSealKey)"
+# arc-runners reads the GitHub App by these keys (githubConfigSecret).
+opted_in arc && seed arc-runners arc-github-app "github_app_id=$(val .secretRefs.arcGithubAppId)" \
+  "github_app_installation_id=$(val .secretRefs.arcGithubAppInstallationId)" \
+  "github_app_private_key=$(val .secretRefs.arcGithubAppPrivateKey)"
+# The admin user name isn't secret; it's piped so the Secret holds both keys the chart reads.
+opted_in grafana && printf admin | seed monitoring grafana "admin-user=-" \
+  "admin-password=$(val .secretRefs.grafanaAdminPassword)"
 opted_in oauth2-proxy && seed oauth2-proxy oauth2-proxy \
   "client-id=$(val .secretRefs.oauth2ProxyClientId)" "client-secret=$(val .secretRefs.oauth2ProxyClientSecret)" \
   "cookie-secret=$(val .secretRefs.oauth2ProxyCookieSecret)"

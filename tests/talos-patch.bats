@@ -1,4 +1,6 @@
 # scripts/talos-cilium-patch renders the Talos machine-config patch that installs the catalog's Cilium.
+refute() { ! "$@"; }
+
 setup() {
   cd "$BATS_TEST_DIRNAME/.." || exit
 }
@@ -19,6 +21,12 @@ setup() {
   grep -q 'helm.sh/chart: cilium-1.20.2' <<<"$manifests"
   grep -A1 'name: KUBERNETES_SERVICE_HOST' <<<"$manifests" | grep -q 'value: "localhost"'
   grep -q 'enable-wireguard: "true"' <<<"$manifests"
+}
+
+@test "patch leaves out Cilium's monitors, whose CRDs don't exist yet" {
+  run scripts/talos-cilium-patch examples/baremetal.yaml
+  [ "$status" -eq 0 ]
+  refute grep -q 'kind: ServiceMonitor' <<<"$(yq -N 'select(.kind == "KubeInlineManifestConfig") | .manifest' <<<"$output")"
 }
 
 @test "patch is only for baremetal clusters" {

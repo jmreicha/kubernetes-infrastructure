@@ -25,3 +25,11 @@ setup() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"in baseline namespace falco"* ]]
 }
+
+@test "a monitor snippet that renders no monitor fails, even when the fixture doesn't monitor it" {
+  yq -i '.enable = ["kube-prometheus-stack"]' "$repo/examples/eks-minimal.yaml"
+  yq -i '(.catalog[] | select(.name == "kor") | .monitor) = "notAKey: true\n"' "$repo/cluster/values.yaml"
+  run "$repo/scripts/verify-render" "$BATS_TEST_TMPDIR/out"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"kor: monitored but renders no"* ]]
+}

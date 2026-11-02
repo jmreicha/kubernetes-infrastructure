@@ -45,7 +45,8 @@ Decisions are ADRs in `docs/adr/`, managed with [adrs](https://github.com/joshro
   system. Avoid `:` in titles; adrs writes them into YAML unquoted.
 
 - Fill in Context, Considered Options (the chosen option plus what was rejected), and Decision
-  Outcome (the choice and why). Don't leave template placeholders; `adrs doctor` fails on them.
+  Outcome (the choice and why). Don't leave template placeholders; `adrs doctor` fails on them,
+  and it treats a literal `...` anywhere as one (reporting it against Decision Outcome).
 - Never rewrite an accepted ADR's decision. Replace it with `adrs new --supersedes <N> ...`, or
   record a narrower change with `adrs link <new> Amends <old>`.
 - The pre-commit hook runs `adrs doctor` on any change under `docs/adr/`; run it directly with

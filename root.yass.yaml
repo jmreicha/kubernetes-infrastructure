@@ -103,7 +103,7 @@ content: |
 
   Sync waves (argocd.argoproj.io/sync-wave)
     -1  AppProjects
-     0  Cilium, Argo CD (adopted from bootstrap)
+     0  Cilium, Argo CD (adopted from bootstrap), prometheus-operator CRDs
      1  core operators that install CRDs or admission webhooks
      2  every other core Application
      3  platform-layer Applications that depend on a StorageClass or on CRDs from wave 1
@@ -130,6 +130,8 @@ design: Catalog
 type: table
 content: |
   project                       chart                                repoURL                                                                        namespace             layer      providers           wave  category
+  arc                           gha-runner-scale-set-controller      oci://ghcr.io/actions/actions-runner-controller-charts                         arc-systems           platform   eks,baremetal,doks  3     system
+  arc-runners                   gha-runner-scale-set                 oci://ghcr.io/actions/actions-runner-controller-charts                         arc-runners           platform   eks,baremetal,doks  4     system
   argo-cd                       argo-cd                              https://argoproj.github.io/argo-helm                                           argocd                bootstrap  eks,baremetal,doks  0     system
   argocd-agent                  argocd-agent-agent                   oci://ghcr.io/argoproj-labs/argocd-agent                                       argocd                core       eks,baremetal,doks  2     system
   argocd-agent-principal        argocd-agent-principal               oci://ghcr.io/argoproj-labs/argocd-agent                                       argocd                core       eks,baremetal,doks  2     system
@@ -151,12 +153,14 @@ content: |
   gatekeeper                    gatekeeper                           https://open-policy-agent.github.io/gatekeeper/charts                          gatekeeper-system     core       eks,baremetal,doks  1     security
   gatekeeper-templates-general  library/general                      https://github.com/open-policy-agent/gatekeeper-library.git                    gatekeeper-system     core       eks,baremetal,doks  2     security
   gatekeeper-templates-psp      library/pod-security-policy          https://github.com/open-policy-agent/gatekeeper-library.git                    gatekeeper-system     core       eks,baremetal,doks  2     security
-  k6-operator                   k6-operator                          https://grafana.github.io/helm-charts                                          k6-operator-system    platform   eks,baremetal,doks  4     system
+  grafana                       grafana                              https://grafana-community.github.io/helm-charts                                monitoring            core       eks,baremetal,doks  2     observability
+  k6-operator                   k6-operator                          https://grafana.github.io/helm-charts                                          k6-operator-system    platform   eks,baremetal,doks  4     observability
   kargo                         kargo                                oci://ghcr.io/akuity/kargo-charts                                              kargo                 platform   eks,baremetal,doks  4     system
   karpenter                     karpenter                            oci://public.ecr.aws/karpenter                                                 kube-system           core       eks                 1     compute
   keda                          keda                                 https://kedacore.github.io/charts                                              keda                  platform   eks,baremetal,doks  4     compute
   keycloak                      keycloakx                            https://codecentric.github.io/helm-charts                                      keycloak              platform   eks,baremetal,doks  4     security
   kor                           kor                                  https://yonahd.github.io/kor                                                   kor                   core       eks,baremetal,doks  2     system
+  kube-prometheus-stack         kube-prometheus-stack                https://prometheus-community.github.io/helm-charts                             monitoring            core       eks,baremetal,doks  2     observability
   kube-state-metrics            kube-state-metrics                   https://prometheus-community.github.io/helm-charts                             kube-system           core       eks,baremetal,doks  2     observability
   kubechecks                    kubechecks                           https://zapier.github.io/kubechecks                                            kubechecks            platform   eks,baremetal,doks  4     system
   kubevirt                      kubevirt                             oci://ghcr.io/naval-group/kubevirt-stack-charts                                kubevirt              platform   baremetal           3     compute
@@ -165,13 +169,16 @@ content: |
   metrics-server                metrics-server                       https://kubernetes-sigs.github.io/metrics-server                               kube-system           core       eks,baremetal,doks  2     observability
   oauth2-proxy                  oauth2-proxy                         https://oauth2-proxy.github.io/manifests                                       oauth2-proxy          platform   eks,baremetal,doks  4     security
   onepassword-connect           connect                              https://1password.github.io/connect-helm-charts                                onepassword           core       eks,baremetal,doks  1     security
+  openbao                       openbao                              https://openbao.github.io/openbao-helm                                         openbao               platform   eks,baremetal,doks  3     security
   openeverest                   openeverest                          https://openeverest.github.io/helm-charts                                      everest-system        platform   eks,baremetal,doks  3     data
   opentelemetry-operator        opentelemetry-operator               https://open-telemetry.github.io/opentelemetry-helm-charts                     opentelemetry         core       eks,baremetal,doks  2     observability
+  prometheus-operator-crds      prometheus-operator-crds             https://prometheus-community.github.io/helm-charts                             monitoring            bootstrap  eks,baremetal,doks  0     observability
   reloader                      reloader                             https://stakater.github.io/stakater-charts                                     reloader              platform   eks,baremetal,doks  4     system
   rook                          rook-ceph                            https://charts.rook.io/release                                                 rook-ceph             core       baremetal           1     storage
   rook-ceph-cluster             rook-ceph-cluster                    https://charts.rook.io/release                                                 rook-ceph             core       baremetal           2     storage
   strimzi                       strimzi-kafka-operator               https://strimzi.io/charts                                                      strimzi               platform   eks,baremetal,doks  3     data
   tetragon                      tetragon                             https://helm.cilium.io                                                         kube-system           core       eks,baremetal,doks  2     security
+  victoria-metrics-k8s-stack    victoria-metrics-k8s-stack           https://victoriametrics.github.io/helm-charts                                  monitoring            core       eks,baremetal,doks  2     observability
   zot                           zot                                  https://zotregistry.dev/helm-charts                                            zot                   core       baremetal           2     system
 
   The catalog is closed: no project outside this table is installed by this project.
@@ -182,8 +189,17 @@ content: |
   cluster values list it in `disable`; an entry marked `optIn` is installed only when they list
   it in `enable`; every other entry is always installed. Every platform-layer entry, longhorn,
   and local-path-provisioner are optional; zot, rook, csi-driver-nfs, democratic-csi,
-  falco, tetragon, argocd-agent, argocd-agent-principal, authentik, keycloak, and oauth2-proxy
-  are opt-in. rook-ceph-cluster is installed only when rook is enabled.
+  falco, tetragon, argocd-agent, argocd-agent-principal, authentik, keycloak, oauth2-proxy,
+  kube-prometheus-stack, victoria-metrics-k8s-stack, grafana, arc, and openbao are opt-in. rook-ceph-cluster is
+  installed only when rook is enabled, and arc-runners only when arc is enabled. prometheus-operator-crds is installed only when
+  kube-prometheus-stack or victoria-metrics-k8s-stack is enabled; the two are never enabled together.
+  An entry may carry `monitor`, values that make its chart render a ServiceMonitor or PodMonitor,
+  and `monitorByDefault`. When a metrics stack is enabled, an installed entry with `monitor` is
+  monitored if it is monitorByDefault or listed in the cluster values' `monitor.add`, and not listed
+  in `monitor.remove`; its `monitor` values are merged over its values. Monitored by default:
+  cilium, argo-cd, cert-manager, external-secrets, falco, tetragon, external-dns,
+  aws-load-balancer-controller, aws-ebs-csi-driver, longhorn, rook-ceph-cluster, karpenter, and
+  kube-state-metrics. An entry without `monitor` renders no ServiceMonitor or PodMonitor.
   local-path-provisioner is installed only when longhorn is disabled and rook is not enabled.
   local-path-provisioner and the gatekeeper-library templates are sourced from git; every other
   entry is a Helm chart.

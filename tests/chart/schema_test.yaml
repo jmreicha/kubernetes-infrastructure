@@ -184,3 +184,42 @@ tests:
           }
     asserts:
       - failedTemplate: {}
+  - it: an entry may carry monitor values and monitorByDefault
+    values: [../../examples/eks.yaml]
+    set:
+      layer: core
+      catalog:
+        - {
+            name: demo,
+            chart: demo,
+            repoURL: https://charts.example.com,
+            version: 1.0.0,
+            namespace: demo,
+            layer: core,
+            providers: [eks],
+            wave: 2,
+            category: system,
+            monitor: "serviceMonitor: {{ enabled: true }}",
+            monitorByDefault: true,
+          }
+    asserts:
+      - hasDocuments: { count: 1 }
+  - it: monitorByDefault without monitor values is rejected
+    values: [../../examples/eks.yaml]
+    set:
+      layer: core
+      catalog:
+        - {
+            name: demo,
+            chart: demo,
+            repoURL: https://charts.example.com,
+            version: 1.0.0,
+            namespace: demo,
+            layer: core,
+            providers: [eks],
+            wave: 2,
+            category: system,
+            monitorByDefault: true,
+          }
+    asserts:
+      - failedTemplate: {}

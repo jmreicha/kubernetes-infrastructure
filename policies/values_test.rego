@@ -291,3 +291,87 @@ test_nfs_settings_shape_checked if {
 test_csi_drivers_on_eks_have_no_effect if {
 	count(values.deny) == 0 with data.catalog as csi_catalog with input as object.union(base_eks, {"enable": ["csi-driver-nfs", "democratic-csi"]})
 }
+
+obs_catalog := array.concat(catalog, [
+	{"name": "kube-prometheus-stack", "layer": "core", "optIn": true},
+	{"name": "victoria-metrics-k8s-stack", "layer": "core", "optIn": true},
+	{"name": "grafana", "layer": "core", "optIn": true},
+])
+
+obs_eks := object.union(base_eks, {
+	"enable": ["kube-prometheus-stack", "grafana"],
+	"secretRefs": object.union(base_eks.secretRefs, {"grafanaAdminPassword": "op://v/g/p"}),
+})
+
+test_metrics_stack_with_grafana_passes if count(values.deny) == 0 with data.catalog as obs_catalog with input as obs_eks
+
+test_both_metrics_stacks_denied if {
+	d := values.deny with data.catalog as obs_catalog with input as object.union(obs_eks, {"enable": ["kube-prometheus-stack", "victoria-metrics-k8s-stack"]})
+	some m in d
+	contains(m, "kube-prometheus-stack and victoria-metrics-k8s-stack")
+}
+
+test_grafana_needs_its_admin_password if {
+	d := values.deny with data.catalog as obs_catalog with input as object.union(object.remove(obs_eks, ["secretRefs"]), {"secretRefs": base_eks.secretRefs})
+	d["missing required key: secretRefs.grafanaAdminPassword"]
+}
+
+arc_catalog := array.concat(catalog, [{"name": "arc", "layer": "platform", "optIn": true}])
+
+arc_eks := object.union(base_eks, {
+	"enable": ["arc"], "arc": {"githubConfigUrl": "https://github.com/example"},
+	"secretRefs": object.union(base_eks.secretRefs, {
+		"arcGithubAppId": "op://v/a/id", "arcGithubAppInstallationId": "op://v/a/inst", "arcGithubAppPrivateKey": "op://v/a/key",
+	}),
+})
+
+test_arc_passes if count(values.deny) == 0 with data.catalog as arc_catalog with input as arc_eks
+
+test_arc_needs_its_settings_and_app if {
+	d := values.deny with data.catalog as arc_catalog with input as object.union(object.remove(arc_eks, ["arc", "secretRefs"]), {"secretRefs": base_eks.secretRefs})
+	d["missing required key: arc"]
+	d["missing required key: secretRefs.arcGithubAppPrivateKey"]
+}
+
+test_arc_settings_without_enable_denied if {
+	d := values.deny with data.catalog as arc_catalog with input as object.union(arc_eks, {"enable": []})
+	d["arc is only allowed when arc is enabled"]
+}
+
+test_arc_settings_shape_checked if {
+	d := values.deny with data.catalog as arc_catalog with input as object.union(arc_eks, {"arc": {"githubConfigUrl": "https://github.com/example", "maxRunners": "5"}})
+	d["arc needs githubConfigUrl (string) and optionally maxRunners (number)"]
+}
+
+mon_catalog := array.concat(catalog, [{"name": "keda", "layer": "platform", "optional": true, "monitor": "x: 1"}])
+
+test_monitor_add_of_monitorable_entry_passes if {
+	count(values.deny) == 0 with data.catalog as mon_catalog with input as object.union(base_eks, {"monitor": {"add": ["keda"]}})
+}
+
+test_monitor_names_without_monitor_values_denied if {
+	d := values.deny with data.catalog as mon_catalog with input as object.union(base_eks, {"monitor": {"add": ["kargo"], "remove": ["nope"]}})
+	some a in d
+	startswith(a, "monitor.add: kargo has no monitor values")
+	some r in d
+	startswith(r, "monitor.remove: nope has no monitor values")
+}
+
+test_monitor_shape_checked if {
+	d := values.deny with data.catalog as mon_catalog with input as object.union(base_eks, {"monitor": {"add": "keda"}})
+	d["monitor needs add and remove as lists of entry names"]
+}
+
+bao_catalog := array.concat(catalog, [{"name": "openbao", "layer": "platform", "optIn": true}])
+
+test_openbao_needs_its_seal_key if {
+	d := values.deny with data.catalog as bao_catalog with input as object.union(base_eks, {"enable": ["openbao"]})
+	d["missing required key: secretRefs.openbaoSealKey"]
+}
+
+test_openbao_with_seal_key_passes if {
+	count(values.deny) == 0 with data.catalog as bao_catalog with input as object.union(base_eks, {
+		"enable": ["openbao"],
+		"secretRefs": object.union(base_eks.secretRefs, {"openbaoSealKey": "op://v/b/seal-key"}),
+	})
+}

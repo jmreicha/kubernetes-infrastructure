@@ -2,12 +2,21 @@
 suite: layers
 templates: [templates/applications.yaml]
 tests:
-  - it: eks core layer renders exactly 17 Applications
+  - it: eks core layer renders exactly 19 Applications
     values: [../../examples/eks.yaml]
     set:
       layer: core
     asserts:
-      - hasDocuments: { count: 17 }
+      - hasDocuments: { count: 19 }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: kube-prometheus-stack,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: grafana, any: true }
       - containsDocument:
           {
             kind: Application,
@@ -82,12 +91,14 @@ tests:
             name: opentelemetry-operator,
             any: true,
           }
-  - it: eks platform layer renders exactly 12 Applications
+  - it: eks platform layer renders exactly 13 Applications
     values: [../../examples/eks.yaml]
     set:
       layer: platform
     asserts:
-      - hasDocuments: { count: 12 }
+      - hasDocuments: { count: 13 }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: openbao, any: true }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: authentik, any: true }
       - containsDocument:
@@ -192,12 +203,21 @@ tests:
       layer: platform
     asserts:
       - hasDocuments: { count: 0 }
-  - it: baremetal core layer renders exactly 16 Applications
+  - it: baremetal core layer renders exactly 18 Applications
     values: [../../examples/baremetal.yaml]
     set:
       layer: core
     asserts:
-      - hasDocuments: { count: 16 }
+      - hasDocuments: { count: 18 }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: victoria-metrics-k8s-stack,
+            any: true,
+          }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: grafana, any: true }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: csi-driver-nfs, any: true }
       - containsDocument:
@@ -356,7 +376,14 @@ tests:
     values: [../../examples/eks.yaml]
     set: { layer: cluster }
     asserts:
-      - hasDocuments: { count: 2 }
+      - hasDocuments: { count: 3 }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: prometheus-operator-crds,
+            any: true,
+          }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: cilium, any: true }
       - containsDocument:
@@ -415,15 +442,22 @@ tests:
       - notExists: { path: spec.source.helm.valuesObject.args }
   - it: doks cluster layer renders Argo CD but not Cilium, which DigitalOcean manages
     values: [../../examples/doks.yaml]
-    set: { layer: cluster }
+    set: { layer: cluster, enable: [] }
     asserts:
       - hasDocuments: { count: 1 }
       - containsDocument: { kind: Application, apiVersion: argoproj.io/v1alpha1, name: argo-cd }
-  - it: doks core layer renders exactly 13 Applications
+  - it: doks core layer renders exactly 14 Applications
     values: [../../examples/doks.yaml]
     set: { layer: core }
     asserts:
-      - hasDocuments: { count: 13 }
+      - hasDocuments: { count: 14 }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: kube-prometheus-stack,
+            any: true,
+          }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: argocd-agent, any: true }
       - containsDocument:
@@ -480,7 +514,11 @@ tests:
     values: [../../examples/doks.yaml]
     set: { layer: platform }
     asserts:
-      - hasDocuments: { count: 10 }
+      - hasDocuments: { count: 12 }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: arc, any: true }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: arc-runners, any: true }
       - notEqual: { path: metadata.name, value: kubevirt }
       - notEqual: { path: metadata.name, value: cdi }
   - it: doks external-dns uses the digitalocean provider and seeded token

@@ -5,6 +5,10 @@
 {{- $catalogLayer := ternary "bootstrap" .Values.layer (eq .Values.layer "cluster") -}}
 {{- range .Values.catalog }}
 {{- if and (ne $.Values.layer "bootstrap") (eq .layer $catalogLayer) (eq (include "apps.enabled" (dict "entry" . "root" $)) "true") }}
+{{- $monitored := eq (include "apps.monitored" (dict "entry" . "root" $)) "true" }}
+{{- $vals := dict }}
+{{- with .values }}{{ $vals = tpl . $ | fromYaml }}{{ end }}
+{{- if $monitored }}{{ $vals = mergeOverwrite $vals (fromYaml .monitor) }}{{ end }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -16,6 +20,9 @@ metadata:
   labels:
     layer: {{ .layer }}
     category: {{ .category }}
+    {{- if $monitored }}
+    monitored: "true"
+    {{- end }}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -31,10 +38,10 @@ spec:
     {{- else }}
     chart: {{ .chart }}
     {{- end }}
-    {{- with .values }}
+    {{- with $vals }}
     helm:
       valuesObject:
-        {{- tpl . $ | fromYaml | toYaml | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
     {{- end }}
   {{- with .ignoreDifferences }}
   ignoreDifferences:

@@ -10,12 +10,14 @@ secret_keys := {
 	"argocdAgentCa", "argocdAgentCert", "argocdAgentKey", "argocdAgentJwtKey",
 	"authentikSecretKey", "authentikPostgresPassword", "keycloakAdminPassword", "keycloakPostgresPassword",
 	"oauth2ProxyClientId", "oauth2ProxyClientSecret", "oauth2ProxyCookieSecret", "democraticCsiConfig",
+	"grafanaAdminPassword", "arcGithubAppId", "arcGithubAppInstallationId", "arcGithubAppPrivateKey",
+	"openbaoSealKey",
 }
 
 allowed_keys := {
 	"clusterName", "provider", "kubernetesVersion", "apiServerHost", "apiServerPort",
 	"domain", "region", "vpcId", "lbIpPool", "coreOnly", "disable", "enable", "defaultStorageClass", "secretRefs",
-	"pullThroughCacheIp", "argocdAgent", "authentik", "keycloak", "oauth2Proxy", "nfs", "democraticCsi",
+	"pullThroughCacheIp", "argocdAgent", "authentik", "keycloak", "oauth2Proxy", "nfs", "democraticCsi", "arc", "monitor",
 }
 
 types := {
@@ -25,6 +27,7 @@ types := {
 	"disable": "array", "enable": "array", "defaultStorageClass": "string", "secretRefs": "object",
 	"pullThroughCacheIp": "string", "argocdAgent": "object",
 	"authentik": "object", "keycloak": "object", "oauth2Proxy": "object", "nfs": "object", "democraticCsi": "object",
+	"arc": "object", "monitor": "object",
 }
 
 disabled := {d | some d in object.get(input, "disable", [])}
@@ -56,8 +59,8 @@ required contains k if {
 
 required contains "argocdAgent" if "argocd-agent" in enabled_opt_ins
 
-# Each identity add-on's settings key, keyed by catalog name.
-identity := {"authentik": "authentik", "keycloak": "keycloak", "oauth2-proxy": "oauth2Proxy"}
+# Each add-on's settings key (identity and arc), keyed by catalog name.
+identity := {"authentik": "authentik", "keycloak": "keycloak", "oauth2-proxy": "oauth2Proxy", "arc": "arc"}
 
 required contains k if {
 	some name, k in identity
@@ -111,6 +114,15 @@ required_refs contains k if {
 }
 
 required_refs contains "argocdAgentJwtKey" if "argocd-agent-principal" in enabled_opt_ins
+
+required_refs contains "grafanaAdminPassword" if "grafana" in enabled_opt_ins
+
+required_refs contains "openbaoSealKey" if "openbao" in enabled_opt_ins
+
+required_refs contains k if {
+	"arc" in enabled_opt_ins
+	some k in {"arcGithubAppId", "arcGithubAppInstallationId", "arcGithubAppPrivateKey"}
+}
 
 identity_refs := {
 	"authentik": {"authentikSecretKey", "authentikPostgresPassword"},
@@ -191,6 +203,29 @@ deny contains "rook replaces longhorn as the default StorageClass; add longhorn 
 	enabled("longhorn")
 }
 
+deny contains "kube-prometheus-stack and victoria-metrics-k8s-stack scrape the same targets; enable only one" if {
+	"kube-prometheus-stack" in enabled_opt_ins
+	"victoria-metrics-k8s-stack" in enabled_opt_ins
+}
+
+# Entries whose catalog entry carries monitor values (ADR 68).
+monitorable contains e.name if {
+	some e in data.catalog
+	e.monitor
+}
+
+deny contains sprintf("monitor.%s: %s has no monitor values; allowed: %v", [k, n, sort(monitorable)]) if {
+	some k in ["add", "remove"]
+	some n in object.get(object.get(input, "monitor", {}), k, [])
+	not n in monitorable
+}
+
+deny contains "monitor needs add and remove as lists of entry names" if {
+	m := object.get(input, "monitor", {})
+	some k in ["add", "remove"]
+	not is_array(object.get(m, k, []))
+}
+
 deny contains "pullThroughCacheIp is only allowed when zot is enabled" if {
 	input.pullThroughCacheIp
 	not "zot" in enabled_opt_ins
@@ -240,6 +275,16 @@ deny contains "oauth2Proxy needs issuerUrl (string)" if {
 }
 
 valid_proxy(p) if is_string(p.issuerUrl)
+
+deny contains "arc needs githubConfigUrl (string) and optionally maxRunners (number)" if {
+	"arc" in enabled_opt_ins
+	not valid_arc(object.get(input, "arc", {}))
+}
+
+valid_arc(a) if {
+	is_string(a.githubConfigUrl)
+	is_number(object.get(a, "maxRunners", 5))
+}
 
 deny contains sprintf("%s is only allowed when %s is enabled", [k, name]) if {
 	some name, k in csi

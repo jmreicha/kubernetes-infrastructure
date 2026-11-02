@@ -47,6 +47,7 @@
       managerFilePatterns: ["/^cluster/values\\.yaml$/"],
       matchStrings: [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\s+tag: (?<currentValue>\\S+)",
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\s+image: \\S+:(?<currentValue>\\S+)",
       ],
     },
     {

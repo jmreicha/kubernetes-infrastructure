@@ -29,13 +29,19 @@ domain: do.example.com
 # coreOnly: true
 
 # Opt-in components to add: zot, rook, csi-driver-nfs, democratic-csi (baremetal), falco,
-# tetragon, argocd-agent, argocd-agent-principal, authentik, keycloak, oauth2-proxy.
+# tetragon, argocd-agent, argocd-agent-principal, authentik, keycloak, oauth2-proxy,
+# kube-prometheus-stack or victoria-metrics-k8s-stack (not both), grafana, arc, openbao.
 enable:
   - argocd-agent # report this cluster's Argo CD to a hub; needs argocdAgent
   - tetragon # runtime inspection
+  - arc # GitHub Actions runners; needs arc
+  - kube-prometheus-stack # metrics, alerting, node-exporter
 
 # Optional components to remove: any platform component, longhorn, local-path-provisioner.
 # disable: [kargo]
+
+# Monitors beyond the defaults (core infrastructure), or none; only with a metrics stack (ADR 68).
+# monitor: { add: [kargo], remove: [cilium] }
 
 # Your own default StorageClass; baremetal only, with longhorn and local-path-provisioner
 # both disabled and rook not enabled.
@@ -72,6 +78,11 @@ argocdAgent:
 # OIDC issuer oauth2-proxy signs users in with (with oauth2-proxy).
 # oauth2Proxy:
 #   issuerUrl: https://auth.example.com/application/o/oauth2-proxy/
+
+# GitHub Actions runners (with arc): where they register, and the scale-out cap (default 5).
+arc:
+  githubConfigUrl: https://github.com/example-org
+  maxRunners: 5
 
 # 1Password references read by bootstrap with `op read`; never secret values.
 secretRefs:
@@ -115,3 +126,14 @@ secretRefs:
   # oauth2ProxyClientId: op://infra/doks/oauth2ProxyClientId
   # oauth2ProxyClientSecret: op://infra/doks/oauth2ProxyClientSecret
   # oauth2ProxyCookieSecret: op://infra/doks/oauth2ProxyCookieSecret
+
+  # Grafana admin password (with grafana).
+  # grafanaAdminPassword: op://infra/doks/grafanaAdminPassword
+
+  # GitHub App the runners register with (with arc).
+  arcGithubAppId: op://infra/doks-arc/app-id
+  arcGithubAppInstallationId: op://infra/doks-arc/installation-id
+  arcGithubAppPrivateKey: op://infra/doks-arc/private-key
+
+  # OpenBao static seal key, 32 bytes as 64 hex characters (with openbao).
+  # openbaoSealKey: op://infra/doks/openbaoSealKey

@@ -1,0 +1,63 @@
+# Per-entry monitors (ADR 68): `monitor` snippets merged when a metrics stack is enabled.
+suite: monitoring
+templates: [templates/applications.yaml]
+tests:
+  - it: without a metrics stack nothing is monitored
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: core }
+    documentSelector: { path: metadata.name, value: cert-manager }
+    asserts:
+      - notExists: { path: spec.source.helm.valuesObject.prometheus }
+      - notExists: { path: metadata.labels.monitored }
+  - it: with a stack, a default-on entry gets its monitor values and label
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: core, enable: [kube-prometheus-stack] }
+    documentSelector: { path: metadata.name, value: cert-manager }
+    asserts:
+      - equal:
+          { path: spec.source.helm.valuesObject.prometheus.servicemonitor.enabled, value: true }
+      - equal: { path: metadata.labels.monitored, value: "true" }
+  - it: monitor values merge over the entry's own values
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: core, enable: [kube-prometheus-stack] }
+    documentSelector: { path: metadata.name, value: cert-manager }
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.crds.enabled, value: true }
+  - it: kube-state-metrics is monitored by default
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: core, enable: [victoria-metrics-k8s-stack] }
+    documentSelector: { path: metadata.name, value: kube-state-metrics }
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.prometheus.monitor.enabled, value: true }
+  - it: monitor.add turns on an entry that is off by default
+    values: [../../examples/eks.yaml]
+    set: { layer: platform, enable: [kube-prometheus-stack], monitor: { add: [keda] } }
+    documentSelector: { path: metadata.name, value: keda }
+    asserts:
+      - equal: { path: metadata.labels.monitored, value: "true" }
+  - it: an entry off by default stays off unless added
+    values: [../../examples/eks.yaml]
+    set: { layer: platform, enable: [kube-prometheus-stack], monitor: { add: [] } }
+    documentSelector: { path: metadata.name, value: keda }
+    asserts:
+      - notExists: { path: metadata.labels.monitored }
+  - it: monitor.remove turns off a default-on entry
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: cluster, enable: [kube-prometheus-stack], monitor: { remove: [cilium] } }
+    documentSelector: { path: metadata.name, value: cilium }
+    asserts:
+      - notExists: { path: metadata.labels.monitored }
+  - it: skipMonitors, used by bootstrap, leaves every monitor out
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: cluster, enable: [kube-prometheus-stack], skipMonitors: true }
+    documentSelector: { path: metadata.name, value: cilium }
+    asserts:
+      - notExists: { path: metadata.labels.monitored }
+      - notExists: { path: spec.source.helm.valuesObject.prometheus.serviceMonitor }
+  - it: the prometheus-operator CRDs come with the bootstrap layer in wave 0
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: cluster, enable: [victoria-metrics-k8s-stack] }
+    documentSelector: { path: metadata.name, value: prometheus-operator-crds }
+    asserts:
+      - equal: { path: 'metadata.annotations["argocd.argoproj.io/sync-wave"]', value: "0" }
+      - equal: { path: spec.project, value: core }
