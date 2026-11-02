@@ -255,3 +255,21 @@ test_monitored_app_with_pod_monitor_passes if {
 test_monitored_app_with_prometheus_rule_passes if {
 	count(render.deny) == 0 with input as monitor_case([{"kind": "PrometheusRule", "metadata": {"name": "x"}}])
 }
+
+test_label_value_over_63_chars_denied if {
+	pod := {"kind": "Deployment", "metadata": {"name": "d"}, "spec": {"template": {"metadata": {"labels": {"a": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}}}}}
+	some m in render.deny with input as object.union(good, {"charts": {"cert-manager": [pod], "keda": []}})
+	contains(m, "longer than 63")
+}
+
+# The API server labels a Job's pods with its name.
+test_job_name_over_63_chars_denied if {
+	job := {"kind": "Job", "metadata": {"name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}}
+	some m in render.deny with input as object.union(good, {"charts": {"cert-manager": [job], "keda": []}})
+	contains(m, "longer than 63")
+}
+
+test_label_value_of_63_chars_passes if {
+	cm := {"kind": "ConfigMap", "metadata": {"name": "c", "labels": {"a": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}}}
+	count(render.deny) == 0 with input as object.union(good, {"charts": {"cert-manager": [cm], "keda": []}})
+}

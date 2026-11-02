@@ -240,3 +240,22 @@ has_monitor(name) if {
 	# PrometheusRule: rook-ceph-cluster's operator creates its ServiceMonitors at runtime.
 	d.kind in {"ServiceMonitor", "PodMonitor", "PrometheusRule"}
 }
+
+# The API server rejects label values over 63 characters; kubeconform's schemas don't check length.
+deny contains sprintf("%s: %s %s label %s=%q is longer than 63 characters", [name, d.kind, d.metadata.name, k, v]) if {
+	some name, docs in input.charts
+	some d in docs
+	some k, v in pod_labels(d)
+	count(sprintf("%v", [v])) > 63
+}
+
+pod_labels(d) := object.union_n([
+	object.get(d, ["metadata", "labels"], {}),
+	object.get(d, ["spec", "template", "metadata", "labels"], {}),
+	job_name_label(d),
+])
+
+# The API server labels a Job's pods with the Job's name.
+job_name_label(d) := {"job-name": d.metadata.name} if d.kind == "Job"
+
+job_name_label(d) := {} if d.kind != "Job"

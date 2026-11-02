@@ -697,6 +697,8 @@ catalog:
       kubeScheduler: { enabled: false }
       kubeProxy: { enabled: false }
       victoria-metrics-operator:
+        # Short name: the cleanup Job's name becomes a pod label, capped at 63 characters.
+        fullnameOverride: vm-operator
         admissionWebhooks:
           certManager:
             enabled: true
