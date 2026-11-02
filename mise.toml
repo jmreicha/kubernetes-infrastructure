@@ -4,6 +4,7 @@
 [tools]
 "github:helm-unittest/helm-unittest" = "1.2.1"
 "github:kubernetes-sigs/kwok" = { version = "0.8.0", asset_pattern = 'kwokctl-{{ os(macos="darwin") }}-{{ arch(x64="amd64") }}', bin = "kwokctl" }
+"github:joshrotenberg/adrs" = "0.13.0"
 "github:shakefu/yass" = "0.4.3"
 "npm:oxfmt" = "0.72.0"
 bats = "1.14.0"

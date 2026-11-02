@@ -1,4 +1,4 @@
-# Classifies changes between the base and head renders (spec/verification Verification.Risk).
+# Classifies changes between the base and head renders (docs/spec/verification Verification.Risk).
 # input: {base: [doc], head: [doc]}, each doc tagged with `renderedBy`, the Application that renders it.
 package risk
 

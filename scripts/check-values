@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validate cluster values files against policies/values.rego (spec/values ClusterValues).
+# Validate cluster values files against policies/values.rego (docs/spec/values ClusterValues).
 # Usage: scripts/check-values <values.yaml>...
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)

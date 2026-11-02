@@ -1,0 +1,13 @@
+# Architecture decision records (https://github.com/joshrotenberg/adrs); see AGENTS.md.
+adr_dir = "docs/adr"
+mode = "ng"
+default_status = "accepted"
+no_edit = true
+
+[templates]
+format = "madr"
+variant = "full"
+
+[doctor]
+# Leftover template placeholders fail the commit, not just warn.
+warnings_as_errors = true

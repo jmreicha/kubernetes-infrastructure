@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Risk check (spec/verification Verification.Risk): render the base commit and the working
+# Risk check (docs/spec/verification Verification.Risk): render the base commit and the working
 # tree for every fixture, report every change, and fail on risky ones.
 # Usage: scripts/verify-risk <base-ref> [out-dir]
 set -euo pipefail

@@ -1,4 +1,4 @@
-{{- /* Default-deny ingress per managed namespace, owned by the lowest layer that deploys into it (spec/security). */ -}}
+{{- /* Default-deny ingress per managed namespace, owned by the lowest layer that deploys into it (docs/spec/security). */ -}}
 {{- $own := dict "cluster" (list "bootstrap") "core" (list "core") "platform" (list "platform") }}
 {{- $lower := dict "cluster" (list) "core" (list "bootstrap") "platform" (list "bootstrap" "core") }}
 {{- /* DigitalOcean manages Cilium on doks; without audit mode these would enforce. */ -}}
@@ -38,7 +38,7 @@ spec:
 {{- end }}
 {{- end }}
 {{- end }}
-{{- /* The principal accepts agents from other clusters (spec/security). */ -}}
+{{- /* The principal accepts agents from other clusters (docs/spec/security). */ -}}
 {{- $principal := dict "name" "argocd-agent-principal" }}
 {{- range .Values.catalog }}{{ if eq .name "argocd-agent-principal" }}{{ $principal = . }}{{ end }}{{ end }}
 {{- if and (eq .Values.layer "cluster") (ne .Values.provider "doks") (eq (include "apps.enabled" (dict "entry" $principal "root" $)) "true") }}

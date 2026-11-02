@@ -1,4 +1,4 @@
-{{- /* Baseline Gatekeeper Constraints in dryrun (spec/security); templates come from gatekeeper-library. */ -}}
+{{- /* Baseline Gatekeeper Constraints in dryrun (docs/spec/security); templates come from gatekeeper-library. */ -}}
 {{- if eq .Values.layer "core" }}
 {{- $pods := list (dict "apiGroups" (list "") "kinds" (list "Pod")) }}
 {{- $constraints := list

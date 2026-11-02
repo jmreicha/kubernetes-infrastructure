@@ -16,25 +16,25 @@ spec: ClusterFoundation
 INPUT:
   - MUST: "accept a provider, which is exactly one of `eks`, `baremetal`, or `doks`"
   - MUST: "accept a cluster values file at `clusters/<cluster-name>.yaml`"
-    CONFORMS: spec/values@ClusterValues
+    CONFORMS: docs/spec/values@ClusterValues
   - MUST: accept a fresh cluster with no CNI installed and nothing yet installed by this project
   - WHEN: the provider is eks
     MUST: install the eks variant of each layer
-    SEE: spec/core@Core.Eks
+    SEE: docs/spec/core@Core.Eks
   - WHEN: the provider is baremetal
     MUST: install the baremetal variant of each layer
-    SEE: spec/core@Core.Baremetal
+    SEE: docs/spec/core@Core.Baremetal
   - WHEN: the provider is doks
     MUST: install the doks variant of each layer
-    SEE: spec/core@Core.Doks
+    SEE: docs/spec/core@Core.Doks
 RETURN:
   - MUST: run the bootstrap layer, then the core layer, then the platform layer, each only after the previous layer has completed, with the ordering enforced by the cluster root Application's sync waves
-    SEE: spec/bootstrap@Bootstrap
+    SEE: docs/spec/bootstrap@Bootstrap
   - MUST: "report success only when every Application of every installed layer is Synced and Healthy, as scripts/bootstrap-cluster does after handover unless run with `--no-wait`"
-    SEE: spec/platform@Platform
+    SEE: docs/spec/platform@Platform
   - WHEN: the provider is baremetal
     MUST: install the baremetal variant of the platform layer
-    SEE: spec/platform@Platform.Baremetal
+    SEE: docs/spec/platform@Platform.Baremetal
   - WHEN: coreOnly is true in the cluster values
     MUST: stop after the core layer, reporting success on the core layer alone
 ERROR:
@@ -49,9 +49,9 @@ SIDE-EFFECT:
   - MUST-NOT: write a secret value to git, to a log, or to any file in this repository
 INVARIANT:
   - MUST: apply the security boundaries to everything it installs
-    CONFORMS: spec/security@Security
+    CONFORMS: docs/spec/security@Security
   - MUST: pass Verification before any change to this repository merges
-    SEE: spec/verification@Verification
+    SEE: docs/spec/verification@Verification
   - USES: GitOpsConventions
   - USES: Catalog
 ---
@@ -59,13 +59,13 @@ design: GitOpsConventions
 type: constraint
 content: |
   Repository layout
-    clusters/<cluster-name>.yaml   per-cluster values (see spec/values ClusterValues)
+    clusters/<cluster-name>.yaml   per-cluster values (see docs/spec/values ClusterValues)
     cluster/                       Helm chart (the app-of-apps) that renders Argo CD
                                    Applications for one layer and one provider
     cluster/values.yaml               catalog entries: project, chart, repoURL, version,
                                    namespace, layer, providers, wave
     cluster/values.schema.json        the shape every catalog entry must have, checked on every render
-    scripts/bootstrap-cluster         the imperative bootstrap (spec/bootstrap)
+    scripts/bootstrap-cluster         the imperative bootstrap (docs/spec/bootstrap)
     policies/                        Rego: cluster values validation and render policies
 
   Roots
@@ -124,57 +124,59 @@ content: |
 
   Namespaces
     Each project installs into the namespace given in the catalog. Namespace labels,
-    network policy, and admission constraints follow spec/security.
+    network policy, and admission constraints follow docs/spec/security.
 ---
 design: Catalog
 type: table
 content: |
-  project                       chart                                repoURL                                                                        namespace             layer      providers           wave
-  argo-cd                       argo-cd                              https://argoproj.github.io/argo-helm                                           argocd                bootstrap  eks,baremetal,doks  0
-  argocd-agent                  argocd-agent-agent                   oci://ghcr.io/argoproj-labs/argocd-agent                                       argocd                core       eks,baremetal,doks  2
-  argocd-agent-principal        argocd-agent-principal               oci://ghcr.io/argoproj-labs/argocd-agent                                       argocd                core       eks,baremetal,doks  2
-  argocd-image-updater          argocd-image-updater                 https://argoproj.github.io/argo-helm                                           argocd                platform   eks,baremetal,doks  4
-  atlas-operator                atlas-operator                       oci://ghcr.io/ariga/charts                                                     atlas-operator        platform   eks,baremetal,doks  4
-  authentik                     authentik                            https://charts.goauthentik.io                                                  authentik             platform   eks,baremetal,doks  4
-  aws-ebs-csi-driver            aws-ebs-csi-driver                   https://kubernetes-sigs.github.io/aws-ebs-csi-driver                           kube-system           core       eks                 1
-  aws-load-balancer-controller  aws-load-balancer-controller         https://aws.github.io/eks-charts                                               kube-system           core       eks                 2
-  cdi                           cdi                                  oci://ghcr.io/naval-group/kubevirt-stack-charts                                cdi                   platform   baremetal           4
-  cert-manager                  cert-manager                         https://charts.jetstack.io                                                     cert-manager          core       eks,baremetal,doks  1
-  cilium                        cilium                               https://helm.cilium.io                                                         kube-system           bootstrap  eks,baremetal       0
-  crossplane                    crossplane                           https://charts.crossplane.io/stable                                            crossplane-system     platform   eks,baremetal,doks  4
-  csi-driver-nfs                csi-driver-nfs                       https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts  kube-system           core       baremetal           1
-  democratic-csi                democratic-csi                       https://democratic-csi.github.io/charts                                        democratic-csi        core       baremetal           1
-  envoy-gateway                 gateway-helm                         oci://registry-1.docker.io/envoyproxy                                          envoy-gateway-system  core       eks,baremetal       1
-  external-dns                  external-dns                         https://kubernetes-sigs.github.io/external-dns                                 external-dns          core       eks,baremetal,doks  2
-  external-secrets              external-secrets                     https://charts.external-secrets.io                                             external-secrets      core       eks,baremetal,doks  1
-  falco                         falco                                https://falcosecurity.github.io/charts                                         falco                 core       eks,baremetal,doks  2
-  gatekeeper                    gatekeeper                           https://open-policy-agent.github.io/gatekeeper/charts                          gatekeeper-system     core       eks,baremetal,doks  1
-  gatekeeper-templates-general  library/general                      https://github.com/open-policy-agent/gatekeeper-library.git                    gatekeeper-system     core       eks,baremetal,doks  2
-  gatekeeper-templates-psp      library/pod-security-policy          https://github.com/open-policy-agent/gatekeeper-library.git                    gatekeeper-system     core       eks,baremetal,doks  2
-  k6-operator                   k6-operator                          https://grafana.github.io/helm-charts                                          k6-operator-system    platform   eks,baremetal,doks  4
-  kargo                         kargo                                oci://ghcr.io/akuity/kargo-charts                                              kargo                 platform   eks,baremetal,doks  4
-  karpenter                     karpenter                            oci://public.ecr.aws/karpenter                                                 kube-system           core       eks                 1
-  keda                          keda                                 https://kedacore.github.io/charts                                              keda                  platform   eks,baremetal,doks  4
-  keycloak                      keycloakx                            https://codecentric.github.io/helm-charts                                      keycloak              platform   eks,baremetal,doks  4
-  kor                           kor                                  https://yonahd.github.io/kor                                                   kor                   core       eks,baremetal,doks  2
-  kube-state-metrics            kube-state-metrics                   https://prometheus-community.github.io/helm-charts                             kube-system           core       eks,baremetal,doks  2
-  kubechecks                    kubechecks                           https://zapier.github.io/kubechecks                                            kubechecks            platform   eks,baremetal,doks  4
-  kubevirt                      kubevirt                             oci://ghcr.io/naval-group/kubevirt-stack-charts                                kubevirt              platform   baremetal           3
-  local-path-provisioner        deploy/chart/local-path-provisioner  https://github.com/rancher/local-path-provisioner.git                          local-path-storage    core       baremetal           1
-  longhorn                      longhorn                             https://charts.longhorn.io                                                     longhorn-system       core       baremetal           1
-  metrics-server                metrics-server                       https://kubernetes-sigs.github.io/metrics-server                               kube-system           core       eks,baremetal,doks  2
-  oauth2-proxy                  oauth2-proxy                         https://oauth2-proxy.github.io/manifests                                       oauth2-proxy          platform   eks,baremetal,doks  4
-  onepassword-connect           connect                              https://1password.github.io/connect-helm-charts                                onepassword           core       eks,baremetal,doks  1
-  openeverest                   openeverest                          https://openeverest.github.io/helm-charts                                      everest-system        platform   eks,baremetal,doks  3
-  opentelemetry-operator        opentelemetry-operator               https://open-telemetry.github.io/opentelemetry-helm-charts                     opentelemetry         core       eks,baremetal,doks  2
-  reloader                      reloader                             https://stakater.github.io/stakater-charts                                     reloader              platform   eks,baremetal,doks  4
-  rook                          rook-ceph                            https://charts.rook.io/release                                                 rook-ceph             core       baremetal           1
-  rook-ceph-cluster             rook-ceph-cluster                    https://charts.rook.io/release                                                 rook-ceph             core       baremetal           2
-  strimzi                       strimzi-kafka-operator               https://strimzi.io/charts                                                      strimzi               platform   eks,baremetal,doks  3
-  tetragon                      tetragon                             https://helm.cilium.io                                                         kube-system           core       eks,baremetal,doks  2
-  zot                           zot                                  https://zotregistry.dev/helm-charts                                            zot                   core       baremetal           2
+  project                       chart                                repoURL                                                                        namespace             layer      providers           wave  category
+  argo-cd                       argo-cd                              https://argoproj.github.io/argo-helm                                           argocd                bootstrap  eks,baremetal,doks  0     system
+  argocd-agent                  argocd-agent-agent                   oci://ghcr.io/argoproj-labs/argocd-agent                                       argocd                core       eks,baremetal,doks  2     system
+  argocd-agent-principal        argocd-agent-principal               oci://ghcr.io/argoproj-labs/argocd-agent                                       argocd                core       eks,baremetal,doks  2     system
+  argocd-image-updater          argocd-image-updater                 https://argoproj.github.io/argo-helm                                           argocd                platform   eks,baremetal,doks  4     system
+  atlas-operator                atlas-operator                       oci://ghcr.io/ariga/charts                                                     atlas-operator        platform   eks,baremetal,doks  4     data
+  authentik                     authentik                            https://charts.goauthentik.io                                                  authentik             platform   eks,baremetal,doks  4     security
+  aws-ebs-csi-driver            aws-ebs-csi-driver                   https://kubernetes-sigs.github.io/aws-ebs-csi-driver                           kube-system           core       eks                 1     storage
+  aws-load-balancer-controller  aws-load-balancer-controller         https://aws.github.io/eks-charts                                               kube-system           core       eks                 2     networking
+  cdi                           cdi                                  oci://ghcr.io/naval-group/kubevirt-stack-charts                                cdi                   platform   baremetal           4     compute
+  cert-manager                  cert-manager                         https://charts.jetstack.io                                                     cert-manager          core       eks,baremetal,doks  1     security
+  cilium                        cilium                               https://helm.cilium.io                                                         kube-system           bootstrap  eks,baremetal       0     networking
+  crossplane                    crossplane                           https://charts.crossplane.io/stable                                            crossplane-system     platform   eks,baremetal,doks  4     system
+  csi-driver-nfs                csi-driver-nfs                       https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts  kube-system           core       baremetal           1     storage
+  democratic-csi                democratic-csi                       https://democratic-csi.github.io/charts                                        democratic-csi        core       baremetal           1     storage
+  envoy-gateway                 gateway-helm                         oci://registry-1.docker.io/envoyproxy                                          envoy-gateway-system  core       eks,baremetal       1     networking
+  external-dns                  external-dns                         https://kubernetes-sigs.github.io/external-dns                                 external-dns          core       eks,baremetal,doks  2     networking
+  external-secrets              external-secrets                     https://charts.external-secrets.io                                             external-secrets      core       eks,baremetal,doks  1     security
+  falco                         falco                                https://falcosecurity.github.io/charts                                         falco                 core       eks,baremetal,doks  2     security
+  gatekeeper                    gatekeeper                           https://open-policy-agent.github.io/gatekeeper/charts                          gatekeeper-system     core       eks,baremetal,doks  1     security
+  gatekeeper-templates-general  library/general                      https://github.com/open-policy-agent/gatekeeper-library.git                    gatekeeper-system     core       eks,baremetal,doks  2     security
+  gatekeeper-templates-psp      library/pod-security-policy          https://github.com/open-policy-agent/gatekeeper-library.git                    gatekeeper-system     core       eks,baremetal,doks  2     security
+  k6-operator                   k6-operator                          https://grafana.github.io/helm-charts                                          k6-operator-system    platform   eks,baremetal,doks  4     system
+  kargo                         kargo                                oci://ghcr.io/akuity/kargo-charts                                              kargo                 platform   eks,baremetal,doks  4     system
+  karpenter                     karpenter                            oci://public.ecr.aws/karpenter                                                 kube-system           core       eks                 1     compute
+  keda                          keda                                 https://kedacore.github.io/charts                                              keda                  platform   eks,baremetal,doks  4     compute
+  keycloak                      keycloakx                            https://codecentric.github.io/helm-charts                                      keycloak              platform   eks,baremetal,doks  4     security
+  kor                           kor                                  https://yonahd.github.io/kor                                                   kor                   core       eks,baremetal,doks  2     system
+  kube-state-metrics            kube-state-metrics                   https://prometheus-community.github.io/helm-charts                             kube-system           core       eks,baremetal,doks  2     observability
+  kubechecks                    kubechecks                           https://zapier.github.io/kubechecks                                            kubechecks            platform   eks,baremetal,doks  4     system
+  kubevirt                      kubevirt                             oci://ghcr.io/naval-group/kubevirt-stack-charts                                kubevirt              platform   baremetal           3     compute
+  local-path-provisioner        deploy/chart/local-path-provisioner  https://github.com/rancher/local-path-provisioner.git                          local-path-storage    core       baremetal           1     storage
+  longhorn                      longhorn                             https://charts.longhorn.io                                                     longhorn-system       core       baremetal           1     storage
+  metrics-server                metrics-server                       https://kubernetes-sigs.github.io/metrics-server                               kube-system           core       eks,baremetal,doks  2     observability
+  oauth2-proxy                  oauth2-proxy                         https://oauth2-proxy.github.io/manifests                                       oauth2-proxy          platform   eks,baremetal,doks  4     security
+  onepassword-connect           connect                              https://1password.github.io/connect-helm-charts                                onepassword           core       eks,baremetal,doks  1     security
+  openeverest                   openeverest                          https://openeverest.github.io/helm-charts                                      everest-system        platform   eks,baremetal,doks  3     data
+  opentelemetry-operator        opentelemetry-operator               https://open-telemetry.github.io/opentelemetry-helm-charts                     opentelemetry         core       eks,baremetal,doks  2     observability
+  reloader                      reloader                             https://stakater.github.io/stakater-charts                                     reloader              platform   eks,baremetal,doks  4     system
+  rook                          rook-ceph                            https://charts.rook.io/release                                                 rook-ceph             core       baremetal           1     storage
+  rook-ceph-cluster             rook-ceph-cluster                    https://charts.rook.io/release                                                 rook-ceph             core       baremetal           2     storage
+  strimzi                       strimzi-kafka-operator               https://strimzi.io/charts                                                      strimzi               platform   eks,baremetal,doks  3     data
+  tetragon                      tetragon                             https://helm.cilium.io                                                         kube-system           core       eks,baremetal,doks  2     security
+  zot                           zot                                  https://zotregistry.dev/helm-charts                                            zot                   core       baremetal           2     system
 
   The catalog is closed: no project outside this table is installed by this project.
+  Every entry has a category (storage, compute, security, networking, observability, data,
+  system), set as the `category` label on its Application so Argo CD can filter by it.
   external-dns and kubechecks are installed only when the cluster values carry a domain.
   Optionality is the same in every layer. An entry marked `optional` is installed unless the
   cluster values list it in `disable`; an entry marked `optIn` is installed only when they list

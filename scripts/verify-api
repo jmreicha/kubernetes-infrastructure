@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# API tier (spec/verification Verification.Api): server-side dry-run of every rendered
+# API tier (docs/spec/verification Verification.Api): server-side dry-run of every rendered
 # manifest against a kwok kube-apiserver, one per Kubernetes version. Needs the render tier's output.
 # Usage: scripts/verify-api [render-dir]
 set -euo pipefail

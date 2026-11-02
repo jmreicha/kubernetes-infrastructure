@@ -1,4 +1,4 @@
-# scripts/bootstrap-cluster: waiting on and reporting each layer (spec/bootstrap).
+# scripts/bootstrap-cluster: waiting on and reporting each layer (docs/spec/bootstrap).
 # shellcheck source=bootstrap_helpers.bash
 source "$BATS_TEST_DIRNAME/bootstrap_helpers.bash"
 

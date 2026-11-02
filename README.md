@@ -26,21 +26,21 @@ A cluster comes up in three layers, each waiting for the one before it to be Syn
 - **Renovate** keeps the catalog's versions current (after 7 days of stability); CI checks every
   change before it merges.
 
-The specs in [`root.yass.yaml`](root.yass.yaml) and [`spec/`](spec/) are the contract the code
-is built against; [`docs/design.md`](docs/design.md) explains the decisions behind them.
+The specs in [`root.yass.yaml`](root.yass.yaml) and [`docs/spec/`](docs/spec/) are the contract the code
+is built against; [`docs/design.md`](docs/design.md) explains the design, and [`docs/adr/`](docs/adr/) records the decisions behind it.
 
 ## Layout
 
-| Path                      | What                                                                                           |
-| ------------------------- | ---------------------------------------------------------------------------------------------- |
-| `cluster/`                | App-of-apps chart; `values.yaml` is the catalog, `values.schema.json` its shape                |
-| `clusters/`               | One values file per cluster ([`spec/values`](spec/values.yass.yaml))                           |
-| `examples/`               | Example cluster values to copy from; also the test fixtures, so they stay valid                |
-| `scripts/`                | Every entry point: `bootstrap`, `test`, `cibuild`, `bootstrap-cluster`, and the tools they use |
-| `policies/`               | Rego for cluster values, render rules, and risky-change checks, with tests                     |
-| `tests/`                  | Chart tests (`tests/chart/`), bats tests, and stubs                                            |
-| `root.yass.yaml`, `spec/` | The specs                                                                                      |
-| `archive/`                | The previous layout, kept for reference; not deployed or tested                                |
+| Path                           | What                                                                                           |
+| ------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `cluster/`                     | App-of-apps chart; `values.yaml` is the catalog, `values.schema.json` its shape                |
+| `clusters/`                    | One values file per cluster ([`docs/spec/values`](docs/spec/values.yass.yaml))                 |
+| `examples/`                    | Example cluster values to copy from; also the test fixtures, so they stay valid                |
+| `scripts/`                     | Every entry point: `bootstrap`, `test`, `cibuild`, `bootstrap-cluster`, and the tools they use |
+| `policies/`                    | Rego for cluster values, render rules, and risky-change checks, with tests                     |
+| `tests/`                       | Chart tests (`tests/chart/`), bats tests, and stubs                                            |
+| `root.yass.yaml`, `docs/spec/` | The specs                                                                                      |
+| `archive/`                     | The previous layout, kept for reference; not deployed or tested                                |
 
 ## Setup
 
@@ -103,7 +103,7 @@ Remove the inline manifest afterwards so `talosctl upgrade-k8s` can't roll back 
 - **Upgrade a project:** Renovate opens the PR; to do it by hand, bump `version` in
   `cluster/values.yaml`.
 - **Add a project:** add a catalog entry to `cluster/values.yaml` and to the `Catalog` table in
-  `root.yass.yaml`, add any per-project rules to the spec under `spec/`, and update the expected
+  `root.yass.yaml`, add any per-project rules to the spec under `docs/spec/`, and update the expected
   Applications in `tests/chart/layers_test.yaml`.
 
 ## Testing

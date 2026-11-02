@@ -1,4 +1,4 @@
-{{- /* AppProjects scoped to each layer's repos and namespaces (spec/security). */ -}}
+{{- /* AppProjects scoped to each layer's repos and namespaces (docs/spec/security). */ -}}
 {{- if has .Values.layer (list "bootstrap" "cluster") }}
 {{- $ns := include "apps.namespaces" . | fromYaml }}
 {{- $repos := include "apps.repos" . | fromYaml }}

@@ -15,6 +15,7 @@ metadata:
     argocd.argoproj.io/sync-wave: {{ .wave | quote }}
   labels:
     layer: {{ .layer }}
+    category: {{ .category }}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

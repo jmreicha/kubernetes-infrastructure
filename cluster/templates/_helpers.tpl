@@ -48,7 +48,7 @@ syncPolicy:
 {{- toYaml $out -}}
 {{- end -}}
 
-{{/* Pod Security labels for a namespace (spec/security). */}}
+{{/* Pod Security labels for a namespace (docs/spec/security). */}}
 {{- define "apps.psaLabels" -}}
 pod-security.kubernetes.io/enforce: {{ ternary "privileged" "baseline" (has .ns .root.Values.privilegedNamespaces) }}
 pod-security.kubernetes.io/warn: restricted

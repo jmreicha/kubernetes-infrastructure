@@ -1,4 +1,4 @@
-# Validates clusters/<name>.yaml (spec/values ClusterValues).
+# Validates clusters/<name>.yaml (docs/spec/values ClusterValues).
 # Catalog names come from data.catalog (cluster/values.yaml).
 package values
 

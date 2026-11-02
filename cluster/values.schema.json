@@ -13,7 +13,16 @@
     "entry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "repoURL", "version", "namespace", "layer", "providers", "wave"],
+      "required": [
+        "name",
+        "repoURL",
+        "version",
+        "namespace",
+        "layer",
+        "providers",
+        "wave",
+        "category"
+      ],
       "properties": {
         "name": { "type": "string", "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" },
         "chart": { "type": "string", "minLength": 1 },
@@ -29,6 +38,17 @@
           "items": { "enum": ["eks", "baremetal", "doks"] }
         },
         "wave": { "type": "integer", "minimum": 0 },
+        "category": {
+          "enum": [
+            "storage",
+            "compute",
+            "security",
+            "networking",
+            "observability",
+            "data",
+            "system"
+          ]
+        },
         "optional": { "type": "boolean" },
         "optIn": { "type": "boolean" },
         "when": { "type": "string" },

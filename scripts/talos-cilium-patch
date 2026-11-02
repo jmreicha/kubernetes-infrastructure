@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Render a Talos 1.14 machine-config patch that installs the catalog's Cilium as an inline
-# manifest, so what Talos installs is exactly what Argo CD later adopts (spec/bootstrap).
+# manifest, so what Talos installs is exactly what Argo CD later adopts (docs/spec/bootstrap).
 # Usage: scripts/talos-cilium-patch clusters/<name>.yaml > cilium-patch.yaml
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)

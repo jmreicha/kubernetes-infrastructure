@@ -1,4 +1,4 @@
-# Render-tier policies over one fixture's bundle (spec/verification Verification.Render).
+# Render-tier policies over one fixture's bundle (docs/spec/verification Verification.Render).
 # input: {cluster, apps, repo: [cluster/ chart docs], charts: {app: [docs]}, unstable: {app: [{kind, name}]}, platformClusterKinds}
 package render
 
@@ -8,7 +8,7 @@ waves := {"bootstrap": {"0"}, "core": {"1", "2"}, "platform": {"3", "4"}}
 
 projects := {"bootstrap": "core", "core": "core", "platform": "platform"}
 
-# Namespaces that need host access on Talos (spec/core, spec/platform).
+# Namespaces that need host access on Talos (docs/spec/core, docs/spec/platform).
 privileged := {"falco", "longhorn", "local-path-provisioner", "kubevirt", "cdi"}
 
 catalog_apps contains a if {
@@ -163,7 +163,7 @@ deny contains sprintf("%s: platform AppProject does not allow cluster-scoped %s/
 	not allowed_platform(d)
 }
 
-# Pod Security baseline (spec/security): host access only in privileged namespaces.
+# Pod Security baseline (docs/spec/security): host access only in privileged namespaces.
 baseline_caps := {
 	"AUDIT_WRITE", "CHOWN", "DAC_OVERRIDE", "FOWNER", "FSETID", "KILL", "MKNOD",
 	"NET_BIND_SERVICE", "SETFCAP", "SETGID", "SETPCAP", "SETUID", "SYS_CHROOT",
@@ -204,7 +204,7 @@ deny contains sprintf("%s: %s %s uses %s in baseline namespace %s", [a.metadata.
 	some h in host_access(pod_spec(d))
 }
 
-# Every image is pinned by tag or digest, and never to `latest` (spec/security).
+# Every image is pinned by tag or digest, and never to `latest` (docs/spec/security).
 image_tag(image) := t if {
 	not contains(image, "@")
 	parts := split(image, "/")

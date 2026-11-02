@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Render tier for every fixture, in parallel (spec/verification Verification.Render).
+# Render tier for every fixture, in parallel (docs/spec/verification Verification.Render).
 # Usage: scripts/verify-render [out-dir]
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)

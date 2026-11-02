@@ -99,6 +99,13 @@ repos:
         files: \.yass\.yaml$
         pass_filenames: false
         priority: 10
+      - id: adrs-doctor
+        name: lint architecture decision records (adrs)
+        entry: mise exec github:joshrotenberg/adrs -- adrs doctor
+        language: system
+        files: ^(docs/adr/|adrs\.toml$)
+        pass_filenames: false
+        priority: 10
 
       # --- Tests ---
       - id: rego-tests
@@ -116,10 +123,10 @@ repos:
         pass_filenames: false
         priority: 20
       - id: bats-tests
-        name: test bootstrap, talos patches, render helpers, renovate, catalog (bats)
+        name: test bootstrap, talos patches, render helpers, renovate, catalog, adr (bats)
         entry: mise exec -- scripts/bats-tests
         language: system
-        files: ^(scripts|tests|examples|cluster|policies|\.github/renovate\.json5)
+        files: ^(scripts|tests|examples|cluster|policies|docs/design\.md|\.github/renovate\.json5)
         pass_filenames: false
         priority: 20
 

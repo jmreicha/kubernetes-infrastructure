@@ -16,6 +16,7 @@ tests:
             layer: core,
             providers: [eks],
             wave: 2,
+            category: system,
           }
     asserts:
       - hasDocuments: { count: 1 }
@@ -33,10 +34,64 @@ tests:
             layer: core,
             providers: [eks],
             wave: 2,
+            category: system,
             optinal: true,
           }
     asserts:
       - failedTemplate: { errorPattern: "optinal" }
+  - it: the category is set as an Application label
+    values: [../../examples/eks.yaml]
+    set:
+      layer: core
+      catalog:
+        - {
+            name: demo,
+            chart: demo,
+            repoURL: https://charts.example.com,
+            version: 1.0.0,
+            namespace: demo,
+            layer: core,
+            providers: [eks],
+            wave: 2,
+            category: storage,
+          }
+    asserts:
+      - equal: { path: metadata.labels.category, value: storage }
+  - it: an unknown category is rejected
+    values: [../../examples/eks.yaml]
+    set:
+      layer: core
+      catalog:
+        - {
+            name: demo,
+            chart: demo,
+            repoURL: https://charts.example.com,
+            version: 1.0.0,
+            namespace: demo,
+            layer: core,
+            providers: [eks],
+            wave: 2,
+            category: gitops,
+          }
+    asserts:
+      - failedTemplate: { errorPattern: "category" }
+  - it: a missing category is rejected
+    values: [../../examples/eks.yaml]
+    set:
+      layer: core
+      catalog:
+        - {
+            name: demo,
+            chart: demo,
+            repoURL: https://charts.example.com,
+            version: 1.0.0,
+            namespace: demo,
+            layer: core,
+            providers: [eks],
+            wave: 2,
+          }
+    asserts:
+      - failedTemplate: { errorPattern: "category" }
   - it: a missing version is rejected
     values: [../../examples/eks.yaml]
     set:
@@ -50,6 +105,7 @@ tests:
             layer: core,
             providers: [eks],
             wave: 2,
+            category: system,
           }
     asserts:
       - failedTemplate: { errorPattern: "version" }
@@ -67,6 +123,7 @@ tests:
             layer: platfrom,
             providers: [eks],
             wave: 2,
+            category: system,
           }
     asserts:
       - failedTemplate: { errorPattern: "layer" }
@@ -84,6 +141,7 @@ tests:
             layer: core,
             providers: [gke],
             wave: 2,
+            category: system,
           }
     asserts:
       - failedTemplate: { errorPattern: "providers" }
@@ -102,6 +160,7 @@ tests:
             layer: core,
             providers: [eks],
             wave: 2,
+            category: system,
           }
     asserts:
       - failedTemplate: {}
@@ -119,6 +178,7 @@ tests:
             layer: core,
             providers: [eks],
             wave: 2,
+            category: system,
             optional: true,
             optIn: true,
           }

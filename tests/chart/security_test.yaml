@@ -1,4 +1,4 @@
-# spec/security: namespace labels, AppProject scope, network policy, encryption, constraints.
+# docs/spec/security: namespace labels, AppProject scope, network policy, encryption, constraints.
 suite: security
 tests:
   - it: a baseline namespace enforces baseline and warns and audits restricted

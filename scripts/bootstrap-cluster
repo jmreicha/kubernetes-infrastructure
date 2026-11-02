@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The bootstrap layer (spec/bootstrap): Cilium, seeded secrets, Argo CD, then the
+# The bootstrap layer (docs/spec/bootstrap): Cilium, seeded secrets, Argo CD, then the
 # AppProjects and cluster root. Everything after that is Argo CD's job.
 # Usage: scripts/bootstrap-cluster clusters/<name>.yaml [--no-wait]   (kubectl context = target cluster)
 # Without --no-wait it then waits for the core and platform layers and reports the outcome.
@@ -124,7 +124,7 @@ opted_in oauth2-proxy && seed oauth2-proxy oauth2-proxy \
   "client-id=$(val .secretRefs.oauth2ProxyClientId)" "client-secret=$(val .secretRefs.oauth2ProxyClientSecret)" \
   "cookie-secret=$(val .secretRefs.oauth2ProxyCookieSecret)"
 
-# argocd-agent PKI (spec/bootstrap SecretSeed): the agent's client cert, or the principal's
+# argocd-agent PKI (docs/spec/bootstrap SecretSeed): the agent's client cert, or the principal's
 # server cert (also used by its resource and Redis proxies) and JWT key. Never generated.
 if opted_in argocd-agent || opted_in argocd-agent-principal; then
   seed argocd argocd-agent-ca "ca.crt=$(val .secretRefs.argocdAgentCa)"

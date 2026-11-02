@@ -1,4 +1,4 @@
-# scripts/bootstrap-cluster on DOKS and with argocd-agent (spec/bootstrap, spec/core Core.Doks).
+# scripts/bootstrap-cluster on DOKS and with argocd-agent (docs/spec/bootstrap, docs/spec/core Core.Doks).
 # shellcheck source=bootstrap_helpers.bash
 source "$BATS_TEST_DIRNAME/bootstrap_helpers.bash"
 

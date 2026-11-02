@@ -1,4 +1,4 @@
-# scripts/bootstrap-cluster: install order and secret seeding (spec/bootstrap).
+# scripts/bootstrap-cluster: install order and secret seeding (docs/spec/bootstrap).
 # shellcheck source=bootstrap_helpers.bash
 source "$BATS_TEST_DIRNAME/bootstrap_helpers.bash"
 
