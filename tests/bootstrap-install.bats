@@ -34,7 +34,7 @@ source "$BATS_TEST_DIRNAME/bootstrap_helpers.bash"
 }
 
 @test "existing secrets are left alone on a re-run" {
-  STUB_EXISTING_SECRETS="op-credentials onepassword-token kargo-admin cloudflare-api-token kubechecks-tokens keycloak democratic-csi-driver-config grafana" \
+  STUB_EXISTING_SECRETS="op-credentials onepassword-token kargo-admin cloudflare-api-token kubechecks-tokens keycloak democratic-csi-driver-config grafana operator-oauth" \
     run scripts/bootstrap-cluster "$work/clusters/baremetal.yaml"
   [ "$status" -eq 0 ]
   refute grep -q '^op read' "$CALLS"
@@ -73,6 +73,14 @@ source "$BATS_TEST_DIRNAME/bootstrap_helpers.bash"
   [ "$status" -eq 0 ]
   [ -s "$CALLS.cilium.values" ] && [ -s "$CALLS.argo-cd.values" ]
   refute grep -qi 'servicemonitor' "$CALLS.cilium.values" "$CALLS.argo-cd.values"
+}
+
+@test "seeds the tailscale OAuth client without trailing newlines, which the operator doesn't trim" {
+  run scripts/bootstrap-cluster "$work/clusters/baremetal.yaml"
+  [ "$status" -eq 0 ]
+  grep -q '^op read --no-newline op://infra/lab-tailscale/client-id$' "$CALLS"
+  grep -q '^op read --no-newline op://infra/lab-tailscale/client-secret$' "$CALLS"
+  grep -q 'kubectl create secret generic operator-oauth -n tailscale --from-file=client_id=.* --from-file=client_secret=' "$CALLS"
 }
 
 @test "seeds openbao's seal key without a trailing newline, which OpenBao doesn't trim" {

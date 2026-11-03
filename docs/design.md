@@ -38,7 +38,7 @@ How the boundary is enforced:
   them (`Core::RETURN` → `Platform::INPUT`).
 - **Permissions.** AppProject `core` may create any cluster-scoped resource. AppProject
   `platform` is limited to CRDs, ClusterRoles, ClusterRoleBindings, webhook
-  configurations, and Namespaces.
+  configurations, Namespaces, IngressClasses, and the few other kinds in `platformClusterKinds`.
 - **Core-only clusters.** `coreOnly: true` stops after core, for clusters that serve no
   apps.
 
@@ -46,11 +46,11 @@ How the boundary is enforced:
 
 Optionality works the same way in every layer. Each catalog entry is one of:
 
-| Kind     | Default       | Cluster values               | Entries                                                                                                                                                                                                                                                                                                                                                  |
-| -------- | ------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Required | Installed     | Can't be turned off          | Everything not listed below                                                                                                                                                                                                                                                                                                                              |
-| Optional | Installed     | `disable: [name]` removes it | Every platform component except the identity add-ons, `longhorn`, `local-path-provisioner`                                                                                                                                                                                                                                                               |
-| Opt-in   | Not installed | `enable: [name]` adds it     | `zot` (bare metal pull-through cache), `rook` (bare metal Ceph), `csi-driver-nfs` and `democratic-csi` (bare metal NFS and iSCSI), `falco`, `tetragon`, `argocd-agent`, `argocd-agent-principal`, `authentik`, `keycloak`, `oauth2-proxy`, `kube-prometheus-stack` or `victoria-metrics-k8s-stack`, `grafana`, `arc` (GitHub Actions runners), `openbao` |
+| Kind     | Default       | Cluster values               | Entries                                                                                                                                                                                                                                                                                                                                                                        |
+| -------- | ------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Required | Installed     | Can't be turned off          | Everything not listed below                                                                                                                                                                                                                                                                                                                                                    |
+| Optional | Installed     | `disable: [name]` removes it | Every platform component except the identity add-ons, `longhorn`, `local-path-provisioner`                                                                                                                                                                                                                                                                                     |
+| Opt-in   | Not installed | `enable: [name]` adds it     | `zot` (bare metal pull-through cache), `rook` (bare metal Ceph), `csi-driver-nfs` and `democratic-csi` (bare metal NFS and iSCSI), `falco`, `tetragon`, `argocd-agent`, `argocd-agent-principal`, `authentik`, `keycloak`, `oauth2-proxy`, `kube-prometheus-stack` or `victoria-metrics-k8s-stack`, `grafana`, `arc` (GitHub Actions runners), `openbao`, `tailscale-operator` |
 
 Naming anything else in either list is rejected. A name the provider doesn't offer, such as
 `kubevirt` on EKS, is accepted and does nothing.
@@ -85,6 +85,9 @@ Naming anything else in either list is rejected. A name the provider doesn't off
   three-replica Raft cluster that unseals itself with a static key from 1Password and
   self-initializes with only Kubernetes auth: get in with a token for the `openbao-admin`
   ServiceAccount and role `admin`. Apps read it through external-secrets. See ADR 69.
+- **Tailnet access.** `enable: [tailscale-operator]` with `secretRefs.tailscaleOauthClient{Id,Secret}`
+  installs the Tailscale operator as `<clusterName>-tailscale-operator`; expose a workload with an
+  Ingress of class `tailscale`. No API server proxy or Connector by default. See ADR 70.
 - **Runtime inspection.** Falco and Tetragon are opt-in on every provider; neither is
   installed unless named in `enable`.
 - **Pull-through cache.** `enable: [zot]` with `pullThroughCacheIp` (an address in

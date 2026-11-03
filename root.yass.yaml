@@ -86,7 +86,7 @@ content: |
     AppProject `platform` is allowed only the cluster-scoped kinds listed in
     cluster/values.yaml `platformClusterKinds`: CustomResourceDefinition, ClusterRole,
     ClusterRoleBinding, webhook configurations, Namespace, APIService, PriorityClass,
-    and the cluster-scoped custom resources its operators need.
+    IngressClass, and the cluster-scoped custom resources its operators need.
     An Application whose chart generates a value on every render (certificates, keys,
     caBundles) lists that resource in ignoreDifferences and adds the
     RespectIgnoreDifferences=true sync option, so it reports Synced and the generated
@@ -177,6 +177,7 @@ content: |
   rook                          rook-ceph                            https://charts.rook.io/release                                                 rook-ceph             core       baremetal           1     storage
   rook-ceph-cluster             rook-ceph-cluster                    https://charts.rook.io/release                                                 rook-ceph             core       baremetal           2     storage
   strimzi                       strimzi-kafka-operator               https://strimzi.io/charts                                                      strimzi               platform   eks,baremetal,doks  3     data
+  tailscale-operator            tailscale-operator                   https://pkgs.tailscale.com/helmcharts                                          tailscale             platform   eks,baremetal,doks  3     networking
   tetragon                      tetragon                             https://helm.cilium.io                                                         kube-system           core       eks,baremetal,doks  2     security
   victoria-metrics-k8s-stack    victoria-metrics-k8s-stack           https://victoriametrics.github.io/helm-charts                                  monitoring            core       eks,baremetal,doks  2     observability
   zot                           zot                                  https://zotregistry.dev/helm-charts                                            zot                   core       baremetal           2     system
@@ -190,7 +191,7 @@ content: |
   it in `enable`; every other entry is always installed. Every platform-layer entry, longhorn,
   and local-path-provisioner are optional; zot, rook, csi-driver-nfs, democratic-csi,
   falco, tetragon, argocd-agent, argocd-agent-principal, authentik, keycloak, oauth2-proxy,
-  kube-prometheus-stack, victoria-metrics-k8s-stack, grafana, arc, and openbao are opt-in. rook-ceph-cluster is
+  kube-prometheus-stack, victoria-metrics-k8s-stack, grafana, arc, openbao, and tailscale-operator are opt-in. rook-ceph-cluster is
   installed only when rook is enabled, and arc-runners only when arc is enabled. prometheus-operator-crds is installed only when
   kube-prometheus-stack or victoria-metrics-k8s-stack is enabled; the two are never enabled together.
   An entry may carry `monitor`, values that make its chart render a ServiceMonitor or PodMonitor,

@@ -30,7 +30,7 @@ domain: lab.example.com
 
 # Opt-in components to add: zot, rook, csi-driver-nfs, democratic-csi (baremetal), falco,
 # tetragon, argocd-agent, argocd-agent-principal, authentik, keycloak, oauth2-proxy,
-# kube-prometheus-stack or victoria-metrics-k8s-stack (not both), grafana, arc, openbao.
+# kube-prometheus-stack or victoria-metrics-k8s-stack (not both), grafana, arc, openbao, tailscale-operator.
 enable:
   - zot # pull-through registry cache; needs pullThroughCacheIp
   - csi-driver-nfs # NFS StorageClass nfs-csi; needs nfs
@@ -38,6 +38,7 @@ enable:
   - keycloak # identity provider; needs keycloak
   - victoria-metrics-k8s-stack # metrics, alerting, node-exporter
   - grafana # dashboards; needs grafanaAdminPassword
+  - tailscale-operator # tailnet ingress; needs tailscaleOauthClient*
 
 # Optional components to remove: any platform component, longhorn, local-path-provisioner.
 # disable: [kargo]
@@ -139,3 +140,7 @@ secretRefs:
 
   # OpenBao static seal key, 32 bytes as 64 hex characters (with openbao).
   # openbaoSealKey: op://infra/lab/openbaoSealKey
+
+  # Tailscale OAuth client that owns tag:k8s-operator (with tailscale-operator).
+  tailscaleOauthClientId: op://infra/lab-tailscale/client-id
+  tailscaleOauthClientSecret: op://infra/lab-tailscale/client-secret

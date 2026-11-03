@@ -51,6 +51,8 @@ INPUT:
   - WHEN: grafana is enabled
     MUST: "carry `secretRefs.grafanaAdminPassword`, an op:// reference"
   - MAY: "carry `monitor.add` and `monitor.remove`, lists of catalog entries to monitor beyond the defaults, or not at all; they take effect only while a metrics stack is enabled"
+  - WHEN: tailscale-operator is enabled
+    MUST: "carry `secretRefs.tailscaleOauthClientId` and `secretRefs.tailscaleOauthClientSecret`, op:// references to a Tailscale OAuth client"
   - WHEN: openbao is enabled
     MUST: "carry `secretRefs.openbaoSealKey`, an op:// reference to a 32-byte key in hex (64 characters)"
   - WHEN: arc is enabled

@@ -375,3 +375,21 @@ test_openbao_with_seal_key_passes if {
 		"secretRefs": object.union(base_eks.secretRefs, {"openbaoSealKey": "op://v/b/seal-key"}),
 	})
 }
+
+ts_catalog := array.concat(catalog, [{"name": "tailscale-operator", "layer": "platform", "optIn": true}])
+
+test_tailscale_needs_its_oauth_client if {
+	d := values.deny with data.catalog as ts_catalog with input as object.union(base_eks, {"enable": ["tailscale-operator"]})
+	d["missing required key: secretRefs.tailscaleOauthClientId"]
+	d["missing required key: secretRefs.tailscaleOauthClientSecret"]
+}
+
+test_tailscale_with_oauth_client_passes if {
+	count(values.deny) == 0 with data.catalog as ts_catalog with input as object.union(base_eks, {
+		"enable": ["tailscale-operator"],
+		"secretRefs": object.union(base_eks.secretRefs, {
+			"tailscaleOauthClientId": "op://v/ts/client-id",
+			"tailscaleOauthClientSecret": "op://v/ts/client-secret",
+		}),
+	})
+}

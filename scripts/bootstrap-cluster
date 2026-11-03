@@ -122,6 +122,9 @@ opted_in authentik && seed authentik authentik \
 opted_in keycloak && seed keycloak keycloak \
   "admin-password=$(val .secretRefs.keycloakAdminPassword)" "db-password=$(val .secretRefs.keycloakPostgresPassword)"
 # OpenBao doesn't trim its static seal key, so it must not end in a newline.
+# The Tailscale operator doesn't trim its OAuth client files either.
+opted_in tailscale-operator && SEED_NO_NEWLINE=1 seed tailscale operator-oauth \
+  "client_id=$(val .secretRefs.tailscaleOauthClientId)" "client_secret=$(val .secretRefs.tailscaleOauthClientSecret)"
 opted_in openbao && SEED_NO_NEWLINE=1 seed openbao openbao-seal "key=$(val .secretRefs.openbaoSealKey)"
 # arc-runners reads the GitHub App by these keys (githubConfigSecret).
 opted_in arc && seed arc-runners arc-github-app "github_app_id=$(val .secretRefs.arcGithubAppId)" \

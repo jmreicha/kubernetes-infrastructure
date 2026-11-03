@@ -11,7 +11,7 @@ secret_keys := {
 	"authentikSecretKey", "authentikPostgresPassword", "keycloakAdminPassword", "keycloakPostgresPassword",
 	"oauth2ProxyClientId", "oauth2ProxyClientSecret", "oauth2ProxyCookieSecret", "democraticCsiConfig",
 	"grafanaAdminPassword", "arcGithubAppId", "arcGithubAppInstallationId", "arcGithubAppPrivateKey",
-	"openbaoSealKey",
+	"openbaoSealKey", "tailscaleOauthClientId", "tailscaleOauthClientSecret",
 }
 
 allowed_keys := {
@@ -118,6 +118,11 @@ required_refs contains "argocdAgentJwtKey" if "argocd-agent-principal" in enable
 required_refs contains "grafanaAdminPassword" if "grafana" in enabled_opt_ins
 
 required_refs contains "openbaoSealKey" if "openbao" in enabled_opt_ins
+
+required_refs contains ref if {
+	"tailscale-operator" in enabled_opt_ins
+	some ref in ["tailscaleOauthClientId", "tailscaleOauthClientSecret"]
+}
 
 required_refs contains k if {
 	"arc" in enabled_opt_ins

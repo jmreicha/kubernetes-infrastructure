@@ -336,3 +336,27 @@ tests:
               kind: ServiceAccount,
               metadata: { name: openbao-admin, namespace: openbao },
             }
+  - it: tailscale-operator is off by default
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform }
+    asserts:
+      - notEqual: { path: metadata.name, value: tailscale-operator }
+  - it: tailscale-operator joins the tailnet under the cluster's name, with the API proxy off
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform, enable: [tailscale-operator] }
+    documentSelector: { path: metadata.name, value: tailscale-operator }
+    asserts:
+      - equal: { path: spec.destination.namespace, value: tailscale }
+      - equal: { path: 'metadata.annotations["argocd.argoproj.io/sync-wave"]', value: "3" }
+      - equal: { path: metadata.labels.category, value: networking }
+      - equal:
+          {
+            path: spec.source.helm.valuesObject.operatorConfig.hostname,
+            value: eks-minimal-tailscale-operator,
+          }
+      - equal: { path: spec.source.helm.valuesObject.apiServerProxyConfig.mode, value: "false" }
+      - equal:
+          {
+            path: 'spec.syncPolicy.managedNamespaceMetadata.labels["pod-security.kubernetes.io/enforce"]',
+            value: privileged,
+          }

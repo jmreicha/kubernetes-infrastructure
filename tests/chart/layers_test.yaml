@@ -275,12 +275,19 @@ tests:
             name: opentelemetry-operator,
             any: true,
           }
-  - it: baremetal platform layer renders exactly 13 Applications
+  - it: baremetal platform layer renders exactly 14 Applications
     values: [../../examples/baremetal.yaml]
     set:
       layer: platform
     asserts:
-      - hasDocuments: { count: 13 }
+      - hasDocuments: { count: 14 }
+      - containsDocument:
+          {
+            kind: Application,
+            apiVersion: argoproj.io/v1alpha1,
+            name: tailscale-operator,
+            any: true,
+          }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: keycloak, any: true }
       - containsDocument:
@@ -392,7 +399,7 @@ tests:
     values: [../../examples/baremetal.yaml]
     set: { layer: platform, disable: [kubevirt] }
     asserts:
-      - hasDocuments: { count: 11 }
+      - hasDocuments: { count: 12 }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: strimzi, any: true }
   - it: an unknown layer fails rendering

@@ -30,7 +30,7 @@ domain: eks.example.com
 
 # Opt-in components to add: zot, rook, csi-driver-nfs, democratic-csi (baremetal), falco,
 # tetragon, argocd-agent, argocd-agent-principal, authentik, keycloak, oauth2-proxy,
-# kube-prometheus-stack or victoria-metrics-k8s-stack (not both), grafana, arc, openbao.
+# kube-prometheus-stack or victoria-metrics-k8s-stack (not both), grafana, arc, openbao, tailscale-operator.
 enable:
   - argocd-agent-principal # accept argocd-agent spokes from other clusters
   - falco # runtime inspection
@@ -140,3 +140,7 @@ secretRefs:
 
   # OpenBao static seal key, 32 bytes as 64 hex characters (with openbao).
   openbaoSealKey: op://infra/eks-openbao/seal-key
+
+  # Tailscale OAuth client that owns tag:k8s-operator (with tailscale-operator).
+  # tailscaleOauthClientId: op://infra/eks-tailscale/client-id
+  # tailscaleOauthClientSecret: op://infra/eks-tailscale/client-secret

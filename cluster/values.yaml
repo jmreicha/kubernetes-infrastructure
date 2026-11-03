@@ -66,6 +66,7 @@ privilegedNamespaces:
     kubevirt,
     cdi,
     monitoring,
+    tailscale,
   ]
 
 # Cluster-scoped kinds the platform AppProject may create.
@@ -78,6 +79,8 @@ platformClusterKinds:
   - { group: "", kind: Namespace }
   - { group: apiregistration.k8s.io, kind: APIService }
   - { group: scheduling.k8s.io, kind: PriorityClass }
+  # An IngressClass only names a controller (tailscale-operator, ADR 70).
+  - { group: networking.k8s.io, kind: IngressClass }
   - { group: cdi.kubevirt.io, kind: CDI }
   - { group: operators.coreos.com, kind: OLMConfig }
   - { group: everest.percona.com, kind: DataImporter }
@@ -1003,6 +1006,25 @@ catalog:
     providers: [eks, baremetal, doks]
     wave: 4
     category: data
+
+  # -- networking --
+  # Tailscale operator (ADR 70): apps opt in per Ingress or Service; its proxies run privileged.
+  - name: tailscale-operator
+    chart: tailscale-operator
+    repoURL: https://pkgs.tailscale.com/helmcharts
+    version: 1.104.4
+    namespace: tailscale
+    layer: platform
+    optIn: true
+    providers: [eks, baremetal, doks]
+    wave: 3
+    category: networking
+    values: |
+      operatorConfig:
+        # Device names are unique per tailnet, and several clusters may share one.
+        hostname: {{ .Values.clusterName }}-tailscale-operator
+      apiServerProxyConfig:
+        mode: "false"
 
   # -- system --
   - name: crossplane

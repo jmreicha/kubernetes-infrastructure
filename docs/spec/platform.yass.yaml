@@ -45,6 +45,9 @@ SIDE-EFFECT:
   - WHEN: openbao is enabled
     MUST: "install OpenBao in `openbao` as a three-replica HA Raft cluster on the default StorageClass, auto-unsealed by a static seal key read from the Secret seeded by SecretSeed, self-initialized with only the Kubernetes auth method and an `admin` role bound to the `openbao-admin` ServiceAccount, with no agent injector, CSI provider, or route"
     SEE: ./bootstrap@SecretSeed
+  - WHEN: tailscale-operator is enabled
+    MUST: "install the Tailscale operator in `tailscale` with its CRDs and the `tailscale` IngressClass, authenticated by the OAuth client in the Secret seeded by SecretSeed, as tailnet device `<clusterName>-tailscale-operator`, with the API server proxy off and no Connector"
+    SEE: ./bootstrap@SecretSeed
   - MUST-NOT: expose Authentik, Keycloak, or oauth2-proxy through a route, or create any realm, application, or OIDC client in them
 ERROR:
   - WHEN: any platform-layer Application is not Synced and Healthy 30 minutes after the platform root Application is applied
