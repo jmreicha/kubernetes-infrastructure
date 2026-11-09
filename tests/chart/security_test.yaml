@@ -178,6 +178,17 @@ tests:
               fromEndpoints:
                 [{ matchLabels: { k8s:io.kubernetes.pod.namespace: external-secrets } }],
             }
+  - it: chaos-mesh's policy admits DNS from the cluster, for pods under DNSChaos
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform, enable: [chaos-mesh] }
+    template: templates/network-policies.yaml
+    documentSelector: { path: metadata.namespace, value: chaos-mesh }
+    asserts:
+      - contains:
+          path: spec.ingress
+          content:
+            fromEntities: [cluster]
+            toPorts: [{ ports: [{ port: "53", protocol: ANY }] }]
   - it: the platform layer does not re-render argocd's policy
     values: [../../examples/eks.yaml]
     set: { layer: platform }

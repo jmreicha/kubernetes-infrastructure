@@ -360,3 +360,60 @@ tests:
             path: 'spec.syncPolicy.managedNamespaceMetadata.labels["pod-security.kubernetes.io/enforce"]',
             value: privileged,
           }
+  - it: chaos-mesh is off by default
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform }
+    asserts:
+      - notEqual: { path: metadata.name, value: chaos-mesh }
+  - it: chaos-mesh targets only annotated namespaces, on containerd, with cert-manager certs
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform, enable: [chaos-mesh] }
+    documentSelector: { path: metadata.name, value: chaos-mesh }
+    asserts:
+      - equal: { path: spec.destination.namespace, value: chaos-mesh }
+      - equal: { path: 'metadata.annotations["argocd.argoproj.io/sync-wave"]', value: "3" }
+      - equal:
+          {
+            path: spec.source.helm.valuesObject.controllerManager.enableFilterNamespace,
+            value: true,
+          }
+      - equal:
+          { path: spec.source.helm.valuesObject.controllerManager.chaosdSecurityMode, value: false }
+      - equal: { path: spec.source.helm.valuesObject.chaosDaemon.runtime, value: containerd }
+      - equal:
+          {
+            path: spec.source.helm.valuesObject.chaosDaemon.socketPath,
+            value: /run/containerd/containerd.sock,
+          }
+      - equal: { path: spec.source.helm.valuesObject.webhook.certManager.enabled, value: true }
+      - equal: { path: spec.source.helm.valuesObject.dashboard.securityMode, value: true }
+      - equal: { path: spec.source.helm.valuesObject.dnsServer.create, value: true }
+      - equal:
+          {
+            path: 'spec.syncPolicy.managedNamespaceMetadata.labels["pod-security.kubernetes.io/enforce"]',
+            value: privileged,
+          }
+  - it: chaos-mesh ignores the random rollme annotation, so pods don't restart on every sync
+    values: [../../examples/eks-minimal.yaml]
+    set: { layer: platform, enable: [chaos-mesh] }
+    documentSelector: { path: metadata.name, value: chaos-mesh }
+    asserts:
+      - contains:
+          path: spec.ignoreDifferences
+          content:
+            {
+              group: apps,
+              kind: Deployment,
+              name: chaos-controller-manager,
+              jsonPointers: [/spec/template/metadata/annotations/rollme],
+            }
+      - contains:
+          path: spec.ignoreDifferences
+          content:
+            {
+              group: apps,
+              kind: DaemonSet,
+              name: chaos-daemon,
+              jsonPointers: [/spec/template/metadata/annotations/rollme],
+            }
+      - contains: { path: spec.syncPolicy.syncOptions, content: RespectIgnoreDifferences=true }

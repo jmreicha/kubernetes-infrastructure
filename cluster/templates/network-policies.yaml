@@ -36,6 +36,10 @@ spec:
     {{- if eq $n "openbao" }}
     - fromEndpoints: [{ matchLabels: { k8s:io.kubernetes.pod.namespace: external-secrets } }]
     {{- end }}
+    {{- if eq $n "chaos-mesh" }}
+    - fromEntities: [cluster]
+      toPorts: [{ ports: [{ port: "53", protocol: ANY }] }]
+    {{- end }}
     {{- end }}
 {{- end }}
 {{- end }}

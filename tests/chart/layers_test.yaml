@@ -91,12 +91,14 @@ tests:
             name: opentelemetry-operator,
             any: true,
           }
-  - it: eks platform layer renders exactly 13 Applications
+  - it: eks platform layer renders exactly 14 Applications
     values: [../../examples/eks.yaml]
     set:
       layer: platform
     asserts:
-      - hasDocuments: { count: 13 }
+      - hasDocuments: { count: 14 }
+      - containsDocument:
+          { kind: Application, apiVersion: argoproj.io/v1alpha1, name: chaos-mesh, any: true }
       - containsDocument:
           { kind: Application, apiVersion: argoproj.io/v1alpha1, name: openbao, any: true }
       - containsDocument:

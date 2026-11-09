@@ -45,6 +45,8 @@ SIDE-EFFECT:
   - WHEN: openbao is enabled
     MUST: "install OpenBao in `openbao` as a three-replica HA Raft cluster on the default StorageClass, auto-unsealed by a static seal key read from the Secret seeded by SecretSeed, self-initialized with only the Kubernetes auth method and an `admin` role bound to the `openbao-admin` ServiceAccount, with no agent injector, CSI provider, or route"
     SEE: ./bootstrap@SecretSeed
+  - WHEN: chaos-mesh is enabled
+    MUST: "install Chaos Mesh in `chaos-mesh` with its daemon on containerd at `/run/containerd/containerd.sock`, webhook and daemon certificates from cert-manager, experiments limited to namespaces annotated `chaos-mesh.org/inject=enabled`, the dashboard in token security mode with no route, and the DNS chaos server"
   - WHEN: tailscale-operator is enabled
     MUST: "install the Tailscale operator in `tailscale` with its CRDs and the `tailscale` IngressClass, authenticated by the OAuth client in the Secret seeded by SecretSeed, as tailnet device `<clusterName>-tailscale-operator`, with the API server proxy off and no Connector"
     SEE: ./bootstrap@SecretSeed

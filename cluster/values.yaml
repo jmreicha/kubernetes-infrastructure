@@ -67,6 +67,7 @@ privilegedNamespaces:
     cdi,
     monitoring,
     tailscale,
+    chaos-mesh,
   ]
 
 # Cluster-scoped kinds the platform AppProject may create.
@@ -942,6 +943,44 @@ catalog:
       metrics:
         serviceMonitor:
           enabled: true
+
+  # Chaos Mesh (ADR 71): experiments only hit namespaces annotated chaos-mesh.org/inject=enabled.
+  - name: chaos-mesh
+    chart: chaos-mesh
+    repoURL: https://charts.chaos-mesh.org
+    version: 2.8.8
+    namespace: chaos-mesh
+    layer: platform
+    optIn: true
+    providers: [eks, baremetal, doks]
+    wave: 3
+    category: observability
+    # The chart sets a random rollme on every render; unignored, every sync restarts the pods.
+    ignoreDifferences:
+      - group: apps
+        kind: Deployment
+        name: chaos-controller-manager
+        jsonPointers: [/spec/template/metadata/annotations/rollme]
+      - group: apps
+        kind: DaemonSet
+        name: chaos-daemon
+        jsonPointers: [/spec/template/metadata/annotations/rollme]
+    values: |
+      controllerManager:
+        enableFilterNamespace: true
+        # chaosd targets physical machines, which we don't; its client cert is regenerated per render.
+        chaosdSecurityMode: false
+      chaosDaemon:
+        # EKS (AL2023), Talos, and DOKS all run containerd here.
+        runtime: containerd
+        socketPath: /run/containerd/containerd.sock
+      webhook:
+        certManager:
+          enabled: true
+      dashboard:
+        securityMode: true
+      dnsServer:
+        create: true
 
   # -- data --
   - name: strimzi

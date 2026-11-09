@@ -40,10 +40,11 @@ settle() {
   [ -d "$2" ]
 }
 
+# Argo CD sees core's cert-manager API, and some charts pick their Certificate version from it.
+API_VERSIONS="--api-versions cert-manager.io/v1"
 # With a metrics stack, Argo CD sees the prometheus-operator API once its CRDs are installed (ADR 68).
-API_VERSIONS=""
 if grep -q 'name: prometheus-operator-crds$' "$out"/apps/*.yaml; then
-  API_VERSIONS="--api-versions monitoring.coreos.com/v1 --api-versions monitoring.coreos.com/v1/ServiceMonitor --api-versions monitoring.coreos.com/v1/PodMonitor"
+  API_VERSIONS="$API_VERSIONS --api-versions monitoring.coreos.com/v1 --api-versions monitoring.coreos.com/v1/ServiceMonitor --api-versions monitoring.coreos.com/v1/PodMonitor"
 fi
 
 # One render per catalog Application, in parallel (roots point back at this repo and are skipped).

@@ -30,7 +30,8 @@ lbIpPool: [10.10.0.0/28]
 
 # Opt-in components to add: zot, rook, csi-driver-nfs, democratic-csi (baremetal), falco,
 # tetragon, argocd-agent, argocd-agent-principal, authentik, keycloak, oauth2-proxy,
-# kube-prometheus-stack or victoria-metrics-k8s-stack (not both), grafana, arc, openbao, tailscale-operator.
+# kube-prometheus-stack or victoria-metrics-k8s-stack (not both), grafana, arc, openbao,
+# tailscale-operator, chaos-mesh.
 enable:
   - rook # Rook Ceph storage; needs longhorn disabled
 

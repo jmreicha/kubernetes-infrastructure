@@ -30,7 +30,8 @@ domain: eks.example.com
 
 # Opt-in components to add: zot, rook, csi-driver-nfs, democratic-csi (baremetal), falco,
 # tetragon, argocd-agent, argocd-agent-principal, authentik, keycloak, oauth2-proxy,
-# kube-prometheus-stack or victoria-metrics-k8s-stack (not both), grafana, arc, openbao, tailscale-operator.
+# kube-prometheus-stack or victoria-metrics-k8s-stack (not both), grafana, arc, openbao,
+# tailscale-operator, chaos-mesh.
 enable:
   - argocd-agent-principal # accept argocd-agent spokes from other clusters
   - falco # runtime inspection
@@ -39,6 +40,7 @@ enable:
   - kube-prometheus-stack # metrics, alerting, node-exporter
   - grafana # dashboards; needs grafanaAdminPassword
   - openbao # secrets manager; needs openbaoSealKey
+  - chaos-mesh # chaos experiments in namespaces annotated chaos-mesh.org/inject=enabled
 
 # Optional components to remove: any platform component, longhorn, local-path-provisioner.
 # disable: [kargo]
